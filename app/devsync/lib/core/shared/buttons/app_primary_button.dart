@@ -27,29 +27,31 @@ class AppPrimaryButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             spacing: 5,
             children: [
-              Icon(
-                leadingIcon,
-                color: isDisabled
-                    ? Color.fromARGB(129, 67, 70, 84)
-                    : Colors.white,
-              ),
+              if (leadingIcon != null)
+                Icon(
+                  leadingIcon,
+                  color: isDisabled
+                      ? Color.fromARGB(129, 67, 70, 84)
+                      : Colors.white,
+                ),
               Text(
                 buttonText,
                 style: isDisabled
                     ? AppStyles.gray_14_500
                     : AppStyles.white_14_500,
               ),
-              Icon(
-                trailingIcon,
-                color: isDisabled
-                    ? Color.fromARGB(129, 67, 70, 84)
-                    : Colors.white,
-              ),
+              if (trailingIcon != null)
+                Icon(
+                  trailingIcon,
+                  color: isDisabled
+                      ? Color.fromARGB(129, 67, 70, 84)
+                      : Colors.white,
+                ),
             ],
           ),
         ),

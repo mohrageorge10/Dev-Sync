@@ -24,9 +24,11 @@ class AppTextButton extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           spacing: 5,
           children: [
-            Icon(leadingIcon, color: Color(0xff0340C2)),
+            if (leadingIcon != null)
+              Icon(leadingIcon, color: Color(0xff0340C2)),
             Text(buttonText, style: AppStyles.lightPrimary_14_500),
-            Icon(trailingIcon, color: Color(0xff0340C2)),
+            if (trailingIcon != null)
+              Icon(trailingIcon, color: Color(0xff0340C2)),
           ],
         ),
       ),
