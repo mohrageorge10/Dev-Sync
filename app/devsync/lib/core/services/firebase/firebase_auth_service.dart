@@ -1,4 +1,3 @@
-
 import 'package:devsync/core/networking/api/end_points.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -16,25 +15,37 @@ class FirebaseAuthService {
 
   bool _googleInitialized = false;
 
+  // ================= Getters =================
+
   User? get currentUser => auth.currentUser;
 
+  String? get currentUserId => auth.currentUser?.uid;
+
+  bool get isSignedIn => auth.currentUser != null;
+
   Stream<User?> get authStateChanges => auth.authStateChanges();
+
+  Stream<User?> get userChanges => auth.userChanges();
+
+  // ================= Google Sign-In Initialization =================
 
   Future<void> _initializeGoogleSignIn() async {
     if (_googleInitialized) return;
 
-    // Google Sign-In v7 on Android needs the *web* client ID, otherwise
-    // authenticate() fails. Throws a clear error if it's missing from .env.
     final String? serverClientId =
         defaultTargetPlatform == TargetPlatform.android
             ? ApiKey.googleServerClientId
             : null;
 
-    await googleSignIn.initialize(serverClientId: serverClientId);
+    await googleSignIn.initialize(
+      serverClientId: serverClientId,
+    );
+
     _googleInitialized = true;
   }
 
-  // Sign in with Email & Password
+  // ================= Email & Password Authentication =================
+
   Future<User?> signInWithEmailAndPassword({
     required String email,
     required String password,
@@ -48,7 +59,6 @@ class FirebaseAuthService {
     return result.user;
   }
 
-  // Sign up with Email & Password
   Future<User?> signUpWithEmailAndPassword({
     required String email,
     required String password,
@@ -62,7 +72,8 @@ class FirebaseAuthService {
     return result.user;
   }
 
-  // Sign in with Google
+  // ================= Google Sign-In =================
+
   Future<User?> signInWithGoogle() async {
     await _initializeGoogleSignIn();
 
@@ -72,9 +83,18 @@ class FirebaseAuthService {
     final GoogleSignInAuthentication googleAuth =
         googleUser.authentication;
 
+    final String? idToken = googleAuth.idToken;
+
+    if (idToken == null) {
+      throw FirebaseAuthException(
+        code: 'google-sign-in-failed',
+        message: 'Google Sign-In did not return an ID token.',
+      );
+    }
+
     final AuthCredential credential =
         GoogleAuthProvider.credential(
-      idToken: googleAuth.idToken,
+      idToken: idToken,
     );
 
     final UserCredential result =
@@ -83,10 +103,75 @@ class FirebaseAuthService {
     return result.user;
   }
 
-  // Sign out
+  // ================= Password Management =================
+
+  Future<void> sendPasswordResetEmail({
+    required String email,
+  }) async {
+    await auth.sendPasswordResetEmail(
+      email: email.trim(),
+    );
+  }
+
+  Future<void> updatePassword({
+    required String newPassword,
+  }) async {
+    final User? user = currentUser;
+
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'No authenticated user was found.',
+      );
+    }
+
+    await user.updatePassword(newPassword);
+  }
+
+  // ================= Email Verification =================
+
+  Future<void> sendEmailVerification() async {
+    final User? user = currentUser;
+
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'No authenticated user was found.',
+      );
+    }
+
+    if (!user.emailVerified) {
+      await user.sendEmailVerification();
+    }
+  }
+
+  // ================= User Profile Management =================
+
+  Future<void> reloadUser() async {
+    await auth.currentUser?.reload();
+  }
+
+  Future<void> updateDisplayName({
+    required String displayName,
+  }) async {
+    await auth.currentUser?.updateDisplayName(
+      displayName.trim(),
+    );
+  }
+
+  Future<void> updatePhotoUrl({
+    required String photoUrl,
+  }) async {
+    await auth.currentUser?.updatePhotoURL(photoUrl);
+  }
+
+  // ================= Sign Out =================
+
   Future<void> signOut() async {
-    await _initializeGoogleSignIn();
     await auth.signOut();
-    await googleSignIn.signOut();
+
+    if (_googleInitialized) {
+      await googleSignIn.signOut();
+    }
   }
 }
