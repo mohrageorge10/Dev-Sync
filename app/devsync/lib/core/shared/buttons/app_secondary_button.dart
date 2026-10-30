@@ -5,9 +5,9 @@ class AppSecondaryButton extends StatelessWidget {
   const AppSecondaryButton({
     super.key,
     required this.onPressed,
+    required this.buttonText,
     this.leadingIcon,
     this.trailingIcon,
-    required this.buttonText,
   });
 
   final VoidCallback onPressed;
@@ -33,7 +33,7 @@ class AppSecondaryButton extends StatelessWidget {
             children: [
               if (leadingIcon != null)
                 Icon(leadingIcon, color: Color(0xff0F1C31)),
-              Text(buttonText, style: AppStyles.primary_14_500),
+              Text(buttonText, style: AppStyles.primary_16_500),
               if (trailingIcon != null)
                 Icon(trailingIcon, color: Color(0xff0F1C31)),
             ],

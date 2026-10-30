@@ -5,9 +5,9 @@ class AppPrimaryButton extends StatelessWidget {
   const AppPrimaryButton({
     super.key,
     required this.onPressed,
+    required this.buttonText,
     this.leadingIcon,
     this.trailingIcon,
-    required this.buttonText,
     this.isDisabled = true,
   });
 
@@ -42,7 +42,7 @@ class AppPrimaryButton extends StatelessWidget {
               Text(
                 buttonText,
                 style: isDisabled
-                    ? AppStyles.gray_14_500
+                    ? AppStyles.gray_16_500
                     : AppStyles.white_14_500,
               ),
               if (trailingIcon != null)
