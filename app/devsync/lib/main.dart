@@ -3,6 +3,7 @@ import 'package:devsync/core/di/setup_locator.dart';
 import 'package:devsync/core/routing/app_router.dart';
 import 'package:devsync/core/routing/app_routes.dart';
 import 'package:devsync/core/theme/app_theme.dart';
+import 'package:devsync/firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -12,7 +13,8 @@ Future<void> main() async {
 
   await dotenv.load(fileName: '.env');
 
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,);
 
   await CacheHelper.init();
 
@@ -29,7 +31,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.light,
+      debugShowCheckedModeBanner: false,
       initialRoute: AppRoutes.splash,
       onGenerateRoute: AppRouter().generateRoute,
     );

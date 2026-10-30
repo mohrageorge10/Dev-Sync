@@ -26,7 +26,7 @@ class AppTextButton extends StatelessWidget {
           children: [
             if (leadingIcon != null)
               Icon(leadingIcon, color: Color(0xff0340C2)),
-            Text(buttonText, style: AppStyles.lightPrimary_14_500),
+            Text(buttonText, style: AppStyles.lightPrimary_16_500),
             if (trailingIcon != null)
               Icon(trailingIcon, color: Color(0xff0340C2)),
           ],
