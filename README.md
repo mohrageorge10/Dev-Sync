@@ -13,6 +13,7 @@ DevSync is a mobile platform that helps developers find collaborators and projec
 - [The Problem](#the-problem)
 - [Key Features](#key-features)
 - [Tech Stack](#tech-stack)
+- [Figma Design](#figma-design)
 - [Project Timeline](#project-timeline)
 - [Team](#team)
 - [Repository Structure](#repository-structure)
@@ -29,50 +30,56 @@ DevSync is a mobile platform that helps developers find collaborators and projec
 
 ## Key Features
 
-| Module                         | Features                                                                                                 |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| **Authentication and Profile** | Sign in with Google or Email, GitHub/Behance links, GitHub data import                                   |
-| **Discovery and AI Matching**  | Project discovery, AI recommendations, explanation of every match, cross-skill match, skill gap analysis |
-| **Project Management**         | Create projects with difficulty and type, task management                                                |
-| **Project AI Assistance**      | AI project setup, AI role generator, missing role alert                                                  |
-| **Collaboration**              | Collaboration requests, team invites, shared links, push notifications (FCM)                             |
-| **Communication**              | 1-1 chat, team chat, workspace, community                                                                |
-| **Release and Quality**        | Free and Pro flavors, code obfuscation, Android App Bundle, runtime permissions                          |
+| Module | Features |
+|---|---|
+| **Authentication and Profile** | Sign in with Google or Email, GitHub/Behance links, GitHub data import |
+| **Discovery and AI Matching** | Project discovery, AI recommendations, explanation of every match, cross-skill match, skill gap analysis |
+| **Project Management** | Create projects with difficulty and type, task management |
+| **Project AI Assistance** | AI project setup, AI role generator, missing role alert |
+| **Collaboration** | Collaboration requests, team invites, shared links, push notifications (FCM) |
+| **Communication** | 1-1 chat, team chat, workspace, community |
+| **Release and Quality** | Free and Pro flavors, code obfuscation, Android App Bundle, runtime permissions |
 
 ## Tech Stack
 
-| Layer             | Technology                                                           |
-| ----------------- | -------------------------------------------------------------------- |
-| **Client**        | Flutter, layered architecture, BLoC/Cubit                            |
-| **Backend**       | Firebase Auth, Firestore, Cloud Functions, Firebase Cloud Messaging  |
-| **External APIs** | GitHub REST API                                                      |
-| **AI**            | LLM-based matching and explanation with engineered prompts           |
-| **Release**       | Flavors (free, pro), Dart code obfuscation, Android App Bundle (AAB) |
-| **Tooling**       | Git and GitHub, GitHub Projects, Figma                               |
+| Layer | Technology |
+|---|---|
+| **Client** | Flutter, layered architecture, BLoC/Cubit |
+| **Backend** | Firebase Auth, Firestore, Cloud Functions, Firebase Cloud Messaging |
+| **External APIs** | GitHub REST API |
+| **AI** | LLM-based matching and explanation with engineered prompts |
+| **Release** | Flavors (free, pro), Dart code obfuscation, Android App Bundle (AAB) |
+| **Tooling** | Git and GitHub, GitHub Projects, Figma |
+
+## Figma Design
+
+Explore the DevSync UI/UX design on Figma:
+
+[View DevSync Design on Figma](https://www.figma.com/design/fMmz0N4iY40mfPTPH7YUlf/Untitled?node-id=559-4&t=b6SETDnmdxaVmRiL-1)
 
 ## Project Timeline
 
-| Phase                                                              | Deadline    |
-| ------------------------------------------------------------------ | ----------- |
+| Phase | Deadline |
+|---|---|
 | Planning and Management, Literature Review, Requirements Gathering | 16 Oct 2026 |
-| System Analysis and Design                                         | 6 Nov 2026  |
-| Implementation                                                     | 30 Nov 2026 |
-| Final Presentation, Testing and Reports                            | 4 Dec 2026  |
+| System Analysis and Design | 6 Nov 2026 |
+| Implementation | 30 Nov 2026 |
+| Final Presentation, Testing and Reports | 4 Dec 2026 |
 
 ## Team
 
-| Member               | Role                                                    |
-| -------------------- | ------------------------------------------------------- |
-| **Mohraeel George**  | Project Manager, Flutter Lead, architecture and release |
-| **Fatma Abdelfatah** | Firebase and backend                                    |
-| **Alaa Salah**       | AI and prompts                                          |
-| **Malak Abdelhakim** | UI/UX design                                            |
-| **Fatma Elsayed**    | Notifications and Cloud Functions                       |
-| **Rana Hany**        | Testing and QA                                          |
+| Member | Role |
+|---|---|
+| **Mohraeel George** | Project Manager, Flutter Lead, architecture and release |
+| **Fatma Abdelfatah** | Firebase and backend |
+| **Alaa Salah** | AI and prompts |
+| **Malak Abdelhakim** | UI/UX design |
+| **Fatma Elsayed** | Notifications and Cloud Functions |
+| **Rana Hany** | Testing and QA |
 
 ## Repository Structure
 
-```
+```text
 DevSync/
 ├── docs/            # Project documents, diagrams, UI/UX, presentation, references
 ├── app/             # Flutter application
