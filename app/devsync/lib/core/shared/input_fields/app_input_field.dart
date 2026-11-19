@@ -1,5 +1,6 @@
 import 'package:devsync/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class AppInputField extends StatefulWidget {
   const AppInputField({
@@ -15,6 +16,12 @@ class AppInputField extends StatefulWidget {
     this.obscureText = false,
     this.enabled = true,
     this.onChanged,
+    this.onSubmitted,
+    this.textCapitalization = TextCapitalization.none,
+    this.minLines,
+    this.maxLines = 1,
+    this.inputFormatters,
+    this.trailingLabelColor,
   });
 
   final TextEditingController controller;
@@ -36,6 +43,20 @@ class AppInputField extends StatefulWidget {
   final bool obscureText;
   final bool enabled;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
+
+  final TextCapitalization textCapitalization;
+
+  /// Multi-line support (keep maxLines = 1 for single-line / obscured text).
+  final int? minLines;
+  final int? maxLines;
+
+  /// e.g. LengthLimitingTextInputFormatter(80).
+  final List<TextInputFormatter>? inputFormatters;
+
+  /// Color of [trailingLabel] when the field has no error/focus accent
+  /// (e.g. orange character counter near the limit).
+  final Color? trailingLabelColor;
 
   @override
   State<AppInputField> createState() => _AppInputFieldState();
@@ -119,7 +140,9 @@ class _AppInputFieldState extends State<AppInputField> {
                         height: 16 / 12,
                         fontWeight: FontWeight.w500,
                         letterSpacing: 0.24,
-                        color: accent ?? c.textSecondary,
+                        color: accent ??
+                            widget.trailingLabelColor ??
+                            c.textSecondary,
                       ),
                     ),
                 ],
@@ -133,6 +156,11 @@ class _AppInputFieldState extends State<AppInputField> {
               obscureText: widget.obscureText,
               keyboardType: widget.keyboardType,
               textInputAction: widget.textInputAction,
+              textCapitalization: widget.textCapitalization,
+              minLines: widget.minLines,
+              maxLines: widget.maxLines,
+              inputFormatters: widget.inputFormatters,
+              onSubmitted: widget.onSubmitted,
               cursorColor: accent ?? c.primary,
               style: TextStyle(
                 fontSize: 16,

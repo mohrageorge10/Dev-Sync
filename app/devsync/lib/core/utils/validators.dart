@@ -74,7 +74,7 @@ class AppValidators {
       return AppStrings.fieldRequiredReq;
     }
     if (value.trim().length < minLength) {
-      return AppStrings.fieldLengthReq;
+      return 'Must be at least $minLength characters';
     }
     return null;
   }

@@ -1,5 +1,4 @@
-import 'package:devsync/core/constants/app_constants.dart';
-import 'package:devsync/core/database/cache.dart';
+import 'package:devsync/core/routing/app_routes.dart';
 import 'package:devsync/core/shared/badges/app_badge.dart';
 import 'package:devsync/core/shared/buttons/app_primary_button.dart';
 import 'package:devsync/core/shared/buttons/app_secondary_button.dart';
@@ -52,7 +51,7 @@ class _TestState extends State<Test> {
 
               AppSecondaryButton(
                 onPressed: () {
-                  print("go");
+                  Navigator.pushNamed(context, AppRoutes.createProject);
                 },
                 buttonText: "go",
                 leadingIcon: Icons.save,

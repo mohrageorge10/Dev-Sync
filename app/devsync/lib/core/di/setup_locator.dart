@@ -3,6 +3,8 @@ import 'package:devsync/core/networking/api/api_consumer.dart';
 import 'package:devsync/core/networking/api/dio_consumer.dart';
 import 'package:devsync/core/services/firebase/firebase_auth_service.dart';
 import 'package:devsync/core/services/firebase/firestore_service.dart';
+import 'package:devsync/features/create_project/data/repositories/builders_repository.dart';
+import 'package:devsync/features/create_project/data/repositories/project_repository.dart';
 import 'package:dio/dio.dart';
 
 void setupLocator() {
@@ -21,5 +23,20 @@ void setupLocator() {
   );
   ServiceLocator.registerLazySingleton<FirestoreService>(
     () => FirestoreService(),
+  );
+
+  // Create Project Repositories
+  ServiceLocator.registerLazySingleton<BuildersRepository>(
+    () => FirestoreBuildersRepository(
+      firestoreService: ServiceLocator.get<FirestoreService>(),
+      authService: ServiceLocator.get<FirebaseAuthService>(),
+    ),
+  );
+  ServiceLocator.registerLazySingleton<ProjectRepository>(
+    () => FirestoreProjectRepository(
+      firestoreService: ServiceLocator.get<FirestoreService>(),
+      authService: ServiceLocator.get<FirebaseAuthService>(),
+      buildersRepository: ServiceLocator.get<BuildersRepository>(),
+    ),
   );
 }

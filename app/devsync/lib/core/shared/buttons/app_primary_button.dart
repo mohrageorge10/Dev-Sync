@@ -1,3 +1,4 @@
+import 'package:devsync/core/theme/app_colors.dart';
 import 'package:devsync/core/theme/app_styles.dart';
 import 'package:flutter/material.dart';
 
@@ -19,11 +20,12 @@ class AppPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = context.colors;
     return GestureDetector(
       onTap: isDisabled ? null : onPressed,
       child: Container(
         decoration: BoxDecoration(
-          color: isDisabled ? Color(0xffDFE8FF) : Color(0xff0340C2),
+          color: isDisabled ? c.subtleBlueSurface : c.primary,
           borderRadius: BorderRadius.circular(12),
         ),
         child: Padding(
@@ -35,22 +37,18 @@ class AppPrimaryButton extends StatelessWidget {
               if (leadingIcon != null)
                 Icon(
                   leadingIcon,
-                  color: isDisabled
-                      ? Color.fromARGB(129, 67, 70, 84)
-                      : Colors.white,
+                  color: isDisabled ? c.textSecondary : c.onPrimary,
                 ),
               Text(
                 buttonText,
                 style: isDisabled
-                    ? AppStyles.gray_16_500
-                    : AppStyles.white_14_500,
+                    ? AppStyles.gray_16_500(context)
+                    : AppStyles.white_14_500(context),
               ),
               if (trailingIcon != null)
                 Icon(
                   trailingIcon,
-                  color: isDisabled
-                      ? Color.fromARGB(129, 67, 70, 84)
-                      : Colors.white,
+                  color: isDisabled ? c.textSecondary : c.onPrimary,
                 ),
             ],
           ),
