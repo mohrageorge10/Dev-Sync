@@ -1,8 +1,8 @@
 import 'package:devsync/core/shared/buttons/app_text_button.dart';
-import 'package:devsync/core/theme/app_colors.dart';
+import 'package:devsync/core/theme/app_styles.dart';
 import 'package:flutter/material.dart';
 
-/// "Already have an account?  Log In" style footer.
+// Footer prompt with inline action link.
 class AuthFooterLink extends StatelessWidget {
   const AuthFooterLink({
     super.key,
@@ -20,10 +20,7 @@ class AuthFooterLink extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          text,
-          style: TextStyle(fontSize: 14, color: context.colors.textSecondary),
-        ),
+        Text(text, style: AppStyles.body14Secondary(context)),
         const SizedBox(width: 6),
         AppTextButton(onPressed: onTap, buttonText: actionLabel),
       ],

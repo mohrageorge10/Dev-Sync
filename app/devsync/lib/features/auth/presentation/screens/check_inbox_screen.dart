@@ -1,15 +1,17 @@
 import 'package:devsync/core/di/service_locator.dart';
 import 'package:devsync/core/shared/buttons/app_primary_button.dart';
 import 'package:devsync/core/shared/buttons/app_secondary_button.dart';
-import 'package:devsync/core/theme/app_colors.dart';
-import 'package:devsync/features/auth/business_logic/auth_cubit.dart';
-import 'package:devsync/features/auth/business_logic/auth_state.dart';
-import 'package:devsync/features/auth/utils/auth_navigation.dart';
-import 'package:devsync/features/auth/widgets/auth_app_bar.dart';
-import 'package:devsync/features/auth/widgets/info_box.dart';
+import 'package:devsync/core/shared/feedback/app_feedback.dart';
+import 'package:devsync/core/theme/app_styles.dart';
+import 'package:devsync/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:devsync/features/auth/presentation/cubit/auth_state.dart';
+import 'package:devsync/features/auth/presentation/widgets/auth_app_bar.dart';
+import 'package:devsync/features/auth/presentation/widgets/auth_navigation.dart';
+import 'package:devsync/features/auth/presentation/widgets/info_box.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+// Confirmation screen shown after sending a password reset link.
 class CheckInboxScreen extends StatelessWidget {
   const CheckInboxScreen({super.key, required this.email});
 
@@ -31,12 +33,17 @@ class _CheckInboxView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.colors;
     return BlocConsumer<AuthCubit, AuthState>(
       listener: (context, state) {
-        if (state is AuthError) showAuthMessage(context, state.message);
+        if (state is AuthError) {
+          showAuthMessage(context, state.message, type: AppFeedbackType.error);
+        }
         if (state is PasswordResetSent) {
-          showAuthMessage(context, 'A new reset link was sent to $email');
+          showAuthMessage(
+            context,
+            'A new reset link was sent to $email',
+            type: AppFeedbackType.success,
+          );
         }
       },
       builder: (context, state) {
@@ -54,29 +61,18 @@ class _CheckInboxView extends StatelessWidget {
                     fit: BoxFit.contain,
                   ),
                   const SizedBox(height: 40),
-                  Text(
-                    'Check your inbox',
-                    style: TextStyle(
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      color: c.textPrimary,
-                    ),
-                  ),
+                  Text('Check your inbox', style: AppStyles.h26(context)),
                   const SizedBox(height: 12),
                   Text.rich(
                     TextSpan(
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 1.5,
-                        color: c.textSecondary,
-                      ),
+                      style: AppStyles.body14Secondary(context),
                       children: [
                         const TextSpan(
                           text: "We've sent a password reset link to ",
                         ),
                         TextSpan(
                           text: email,
-                          style: TextStyle(color: c.textPrimary),
+                          style: AppStyles.body14Primary(context),
                         ),
                         const TextSpan(
                           text:
@@ -98,9 +94,11 @@ class _CheckInboxView extends StatelessWidget {
                     child: AppSecondaryButton(
                       buttonText: loading ? 'Sending...' : 'Resend Email',
                       leadingIcon: Icons.forward_to_inbox_outlined,
-                      onPressed: () => context
-                          .read<AuthCubit>()
-                          .sendPasswordResetEmail(email),
+                      onPressed: loading
+                          ? () {}
+                          : () => context
+                              .read<AuthCubit>()
+                              .sendPasswordResetEmail(email),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -110,7 +108,6 @@ class _CheckInboxView extends StatelessWidget {
                       buttonText: 'Back to Log In',
                       trailingIcon: Icons.arrow_forward,
                       isDisabled: false,
-                      // Pops this screen + Forgot Password, landing on Log In.
                       onPressed: () {
                         var popped = 0;
                         Navigator.popUntil(context, (_) => popped++ >= 2);

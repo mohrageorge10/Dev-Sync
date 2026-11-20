@@ -1,6 +1,7 @@
 import 'package:devsync/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 
+// Tinted icon badge used in auth headers and sheets.
 class IconBadge extends StatelessWidget {
   const IconBadge({
     super.key,

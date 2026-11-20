@@ -4,13 +4,12 @@ import 'package:devsync/core/networking/errors/firebase_error_handler.dart';
 import 'package:devsync/core/services/firebase/firebase_auth_service.dart';
 import 'package:devsync/core/services/firebase/firebase_constants.dart';
 import 'package:devsync/core/services/firebase/firestore_service.dart';
-import 'package:devsync/features/auth/data/models/user_model.dart';
+import 'package:devsync/features/auth/data/model/user_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-/// A readable error for the UI. The Cubit shows [message] as is.
+// Readable authentication error exposed to the UI.
 class AuthException implements Exception {
   const AuthException(this.message);
 
@@ -20,8 +19,9 @@ class AuthException implements Exception {
   String toString() => 'AuthException: $message';
 }
 
-class AuthRepo {
-  AuthRepo({
+// Repository handling Firebase authentication and Firestore user profile setup.
+class AuthRepository {
+  AuthRepository({
     required FirebaseAuthService authService,
     required FirestoreService firestoreService,
   })  : _auth = authService,
@@ -38,8 +38,7 @@ class AuthRepo {
   static const _publicIdLength = 8;
   static const _publicIdMaxAttempts = 5;
 
-  // ================= Email & Password =================
-
+  // Email and password sign-in.
   Future<UserModel> login({
     required String email,
     required String password,
@@ -53,6 +52,7 @@ class AuthRepo {
         return _profileOrSignOut(user);
       });
 
+  // Email and password registration with profile creation.
   Future<UserModel> register({
     required String name,
     required String email,
@@ -69,16 +69,12 @@ class AuthRepo {
           await _auth.updateDisplayName(displayName: name);
           return await _loadOrCreateProfile(user, name: name);
         } catch (_) {
-          // The profile could not be saved: remove the new auth account so
-          // the user can simply try again with the same email.
           await _rollbackNewUser(user);
           rethrow;
         }
       });
 
-  // ================= Google =================
-
-  /// Returns null when the user closes the Google dialog (not an error).
+  // Google sign-in; returns null if cancelled by the user.
   Future<UserModel?> signInWithGoogle() async {
     try {
       return await _guard(() async {
@@ -92,22 +88,17 @@ class AuthRepo {
     }
   }
 
-  // ================= Password reset / Logout =================
-
+  // Send password reset link.
   Future<void> sendPasswordResetEmail(String email) =>
       _guard(() => _auth.sendPasswordResetEmail(email: email));
 
+  // Sign out current user.
   Future<void> logout() => _guard(() => _auth.signOut());
 
-  // ================= Profile (Firestore) =================
-
-  /// Existing profile -> returned as is (same uid / publicId forever).
-  /// New user          -> `users/{uid}`, `userPrivate/{uid}` and
-  ///                      `publicIds/{publicId}` are created together.
+  // Load existing Firestore profile or create a new one atomically.
   Future<UserModel> _loadOrCreateProfile(User user, {String? name}) async {
     try {
       final email = user.email ?? '';
-
       final existing = await _firestore.getDocument(
         collectionPath: FirebaseConstants.usersCollection,
         docId: user.uid,
@@ -131,13 +122,12 @@ class AuthRepo {
     } on AuthException {
       rethrow;
     } catch (e) {
-      debugPrint('AuthRepo: profile load/save failed: $e');
+      debugPrint('AuthRepository: profile load/save failed: $e');
       throw const AuthException(_profileMessage);
     }
   }
 
-  /// Saves the 3 documents in ONE transaction (all or nothing) and makes
-  /// sure the generated publicId is not already used by someone else.
+  // Create publicIds, users, and userPrivate documents in a single transaction.
   Future<UserModel> _createProfile(UserModel base) async {
     for (var attempt = 0; attempt < _publicIdMaxAttempts; attempt++) {
       final publicId = _generatePublicId();
@@ -157,10 +147,9 @@ class AuthRepo {
         );
 
         final taken = await tx.get(publicRef);
-        if (taken.exists) return false; // collision -> try another id
+        if (taken.exists) return false;
 
         final now = _firestore.serverTimestamp;
-
         tx.set(publicRef, {
           FirebaseConstants.fieldUid: base.uid,
           FirebaseConstants.fieldCreatedAt: now,
@@ -196,8 +185,6 @@ class AuthRepo {
     ).join();
   }
 
-  /// Login / Google: if the profile can't be loaded or created, sign out so
-  /// the app never stays signed in without a profile.
   Future<UserModel> _profileOrSignOut(User user) async {
     try {
       return await _loadOrCreateProfile(user);
@@ -215,9 +202,6 @@ class AuthRepo {
     }
   }
 
-  // ================= Errors =================
-
-  /// Turns Firebase errors into [AuthException] with a friendly message.
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {
       return await action();

@@ -31,6 +31,18 @@ class AppStyles {
   );
 
   // Headings.
+  static TextStyle h30(BuildContext context) => TextStyle(
+    fontSize: 30,
+    fontWeight: FontWeight.w800,
+    color: context.colors.textPrimary,
+  );
+
+  static TextStyle h26(BuildContext context) => TextStyle(
+    fontSize: 26,
+    fontWeight: FontWeight.w800,
+    color: context.colors.textPrimary,
+  );
+
   static TextStyle h1(BuildContext context) => TextStyle(
     fontSize: 24,
     fontWeight: FontWeight.w800,
@@ -48,6 +60,13 @@ class AppStyles {
     fontWeight: FontWeight.w800,
     color: context.colors.textPrimary,
   );
+
+  static TextStyle title17SemiBold(BuildContext context, {Color? color}) =>
+      TextStyle(
+        fontSize: 17,
+        fontWeight: FontWeight.w600,
+        color: color ?? context.colors.textPrimary,
+      );
 
   // Titles & section headers.
   static TextStyle title16Bold(BuildContext context, {Color? color}) =>
@@ -71,6 +90,25 @@ class AppStyles {
         color: color ?? context.colors.textPrimary,
       );
 
+  static TextStyle body14Bold(BuildContext context, {Color? color}) =>
+      TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+        color: color ?? context.colors.textPrimary,
+      );
+
+  static TextStyle body14Primary(BuildContext context) => TextStyle(
+    fontSize: 14,
+    height: 1.45,
+    color: context.colors.textPrimary,
+  );
+
+  static TextStyle body14Secondary(BuildContext context) => TextStyle(
+    fontSize: 14,
+    height: 1.45,
+    color: context.colors.textSecondary,
+  );
+
   // Body styles (15 - 11px).
   static TextStyle body15(BuildContext context, {bool active = true}) =>
       TextStyle(
@@ -88,6 +126,12 @@ class AppStyles {
         color: color ?? context.colors.textPrimary,
       );
 
+  static TextStyle body13Secondary(BuildContext context) => TextStyle(
+    fontSize: 13,
+    height: 1.4,
+    color: context.colors.textSecondary,
+  );
+
   static TextStyle body12Bold(BuildContext context, {Color? color}) =>
       TextStyle(
         fontSize: 12,
@@ -102,11 +146,36 @@ class AppStyles {
         color: color ?? context.colors.textPrimary,
       );
 
+  static TextStyle body12Medium(BuildContext context, {Color? color}) =>
+      TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: color ?? context.colors.textSecondary,
+      );
+
   static TextStyle body12Primary(BuildContext context) =>
       TextStyle(fontSize: 12, color: context.colors.textPrimary);
 
   static TextStyle body12Secondary(BuildContext context) =>
       TextStyle(fontSize: 12, color: context.colors.textSecondary);
+
+  static TextStyle body12Error(BuildContext context) =>
+      TextStyle(fontSize: 12, color: context.colors.error);
+
+  static TextStyle inputText(BuildContext context, {bool hasError = false}) =>
+      TextStyle(
+        fontSize: 16,
+        height: 1.5,
+        color: hasError
+            ? context.colors.error
+            : context.colors.textPrimary,
+      );
+
+  static TextStyle inputHint(BuildContext context) => TextStyle(
+    fontSize: 16,
+    height: 1.5,
+    color: context.colors.textSecondary,
+  );
 
   static TextStyle body11Bold(BuildContext context, {Color? color}) =>
       TextStyle(

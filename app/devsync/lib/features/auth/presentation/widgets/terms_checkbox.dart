@@ -1,6 +1,8 @@
 import 'package:devsync/core/theme/app_colors.dart';
+import 'package:devsync/core/theme/app_styles.dart';
 import 'package:flutter/material.dart';
 
+// Terms of Service and Privacy Policy agreement checkbox.
 class TermsCheckbox extends StatelessWidget {
   const TermsCheckbox({
     super.key,
@@ -14,7 +16,7 @@ class TermsCheckbox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final link = TextStyle(fontWeight: FontWeight.w700, color: c.darkBlueAccent);
+    final link = AppStyles.body12Bold(context, color: c.darkBlueAccent);
 
     return Row(
       children: [
@@ -40,7 +42,7 @@ class TermsCheckbox extends StatelessWidget {
         Expanded(
           child: Text.rich(
             TextSpan(
-              style: TextStyle(fontSize: 12, color: c.textPrimary),
+              style: AppStyles.body12Primary(context),
               children: [
                 const TextSpan(text: 'I agree to the '),
                 TextSpan(text: 'Terms of Service', style: link),

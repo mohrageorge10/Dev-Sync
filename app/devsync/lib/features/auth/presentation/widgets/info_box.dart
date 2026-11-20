@@ -1,6 +1,8 @@
 import 'package:devsync/core/theme/app_colors.dart';
+import 'package:devsync/core/theme/app_styles.dart';
 import 'package:flutter/material.dart';
 
+// Subtle informational notice box.
 class InfoBox extends StatelessWidget {
   const InfoBox({
     super.key,
@@ -33,24 +35,10 @@ class InfoBox extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (title != null) ...[
-                  Text(
-                    title!,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: c.textPrimary,
-                    ),
-                  ),
+                  Text(title!, style: AppStyles.body14Bold(context)),
                   const SizedBox(height: 4),
                 ],
-                Text(
-                  text,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    height: 1.4,
-                    color: c.textSecondary,
-                  ),
-                ),
+                Text(text, style: AppStyles.body13Secondary(context)),
               ],
             ),
           ),

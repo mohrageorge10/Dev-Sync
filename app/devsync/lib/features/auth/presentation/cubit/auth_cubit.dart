@@ -1,17 +1,16 @@
-import 'package:devsync/features/auth/business_logic/auth_state.dart';
-import 'package:devsync/features/auth/data/models/user_model.dart';
-import 'package:devsync/features/auth/data/repos/auth_repo.dart';
+import 'package:devsync/features/auth/data/repositories/auth_repository.dart';
+import 'package:devsync/features/auth/presentation/cubit/auth_state.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+// Cubit managing login, registration, Google sign-in, password reset, and logout.
 class AuthCubit extends Cubit<AuthState> {
   AuthCubit(this._repo) : super(const AuthInitial());
 
-  final AuthRepo _repo;
+  final AuthRepository _repo;
 
   static const _genericError = 'Something went wrong. Please try again.';
 
-  /// Runs [action] with the shared loading / error handling.
-  /// Ignores taps while another request is running (no double submit).
+  // Execute auth action with loading and error state handling.
   Future<void> _run(Future<AuthState?> Function() action) async {
     if (state is AuthLoading) return;
     emit(const AuthLoading());
@@ -28,7 +27,7 @@ class AuthCubit extends Cubit<AuthState> {
 
   Future<void> login({required String email, required String password}) =>
       _run(() async {
-        final UserModel user =
+        final user =
             await _repo.login(email: email.trim(), password: password);
         return AuthSuccess(user);
       });
@@ -39,7 +38,7 @@ class AuthCubit extends Cubit<AuthState> {
     required String password,
   }) =>
       _run(() async {
-        final UserModel user = await _repo.register(
+        final user = await _repo.register(
           name: name.trim(),
           email: email.trim(),
           password: password,
@@ -49,7 +48,6 @@ class AuthCubit extends Cubit<AuthState> {
 
   Future<void> signInWithGoogle() => _run(() async {
         final user = await _repo.signInWithGoogle();
-        // null = user cancelled the dialog -> back to initial, no error.
         return user == null ? null : AuthSuccess(user);
       });
 

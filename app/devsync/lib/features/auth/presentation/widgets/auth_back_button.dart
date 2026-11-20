@@ -1,6 +1,7 @@
 import 'package:devsync/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 
+// Back button for auth form screens.
 class AuthBackButton extends StatelessWidget {
   const AuthBackButton({super.key});
 

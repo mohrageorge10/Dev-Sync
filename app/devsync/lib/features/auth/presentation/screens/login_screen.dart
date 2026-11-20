@@ -1,23 +1,23 @@
 import 'package:devsync/core/di/service_locator.dart';
+import 'package:devsync/core/routing/app_routes.dart';
 import 'package:devsync/core/shared/buttons/app_primary_button.dart';
 import 'package:devsync/core/shared/buttons/app_text_button.dart';
+import 'package:devsync/core/shared/feedback/app_feedback.dart';
 import 'package:devsync/core/shared/input_fields/app_input_field.dart';
 import 'package:devsync/core/utils/validators.dart';
-import 'package:devsync/features/auth/business_logic/auth_cubit.dart';
-import 'package:devsync/features/auth/business_logic/auth_state.dart';
-import 'package:devsync/features/auth/utils/auth_navigation.dart';
-import 'package:devsync/features/auth/widgets/auth_back_button.dart';
-import 'package:devsync/features/auth/widgets/auth_footer_link.dart';
-import 'package:devsync/features/auth/widgets/auth_header.dart';
-import 'package:devsync/features/auth/widgets/google_button.dart';
-import 'package:devsync/features/auth/widgets/or_divider.dart';
-import 'package:devsync/features/auth/widgets/password_field.dart';
+import 'package:devsync/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:devsync/features/auth/presentation/cubit/auth_state.dart';
+import 'package:devsync/features/auth/presentation/widgets/auth_back_button.dart';
+import 'package:devsync/features/auth/presentation/widgets/auth_footer_link.dart';
+import 'package:devsync/features/auth/presentation/widgets/auth_header.dart';
+import 'package:devsync/features/auth/presentation/widgets/auth_navigation.dart';
+import 'package:devsync/features/auth/presentation/widgets/google_button.dart';
+import 'package:devsync/features/auth/presentation/widgets/or_divider.dart';
+import 'package:devsync/features/auth/presentation/widgets/password_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'create_account_screen.dart';
-import 'forgot_password_screen.dart';
-
+// Sign-in screen with email/password and Google auth.
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
 
@@ -61,7 +61,9 @@ class _LoginViewState extends State<_LoginView> {
   Widget build(BuildContext context) {
     return BlocConsumer<AuthCubit, AuthState>(
       listener: (context, state) {
-        if (state is AuthError) showAuthMessage(context, state.message);
+        if (state is AuthError) {
+          showAuthMessage(context, state.message, type: AppFeedbackType.error);
+        }
         if (state is AuthSuccess) onAuthenticated(context);
       },
       builder: (context, state) {
@@ -86,6 +88,7 @@ class _LoginViewState extends State<_LoginView> {
                       controller: _emailCtrl,
                       label: 'Email',
                       hint: 'alex@example.com',
+                      prefixIcon: Icons.mail_outline,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       enabled: !loading,
@@ -96,22 +99,18 @@ class _LoginViewState extends State<_LoginView> {
                       controller: _passCtrl,
                       label: 'Password',
                       hint: 'Enter your password',
-                      prefixIcon: Icons.lock_outline,
                       textInputAction: TextInputAction.done,
-                      // Login only needs "not empty" (not the strength rule).
-                      validator: (v) =>
-                          v.isEmpty ? 'Please enter your password' : null,
+                      enabled: !loading,
+                      validator: AppValidators.validateLoginPassword,
                     ),
                     const SizedBox(height: 8),
                     Align(
                       alignment: Alignment.centerRight,
                       child: AppTextButton(
                         buttonText: 'Forgot Password?',
-                        onPressed: () => Navigator.push(
+                        onPressed: () => Navigator.pushNamed(
                           context,
-                          MaterialPageRoute(
-                            builder: (_) => const ForgotPasswordScreen(),
-                          ),
+                          AppRoutes.forgotPassword,
                         ),
                       ),
                     ),
@@ -128,6 +127,7 @@ class _LoginViewState extends State<_LoginView> {
                     const OrDivider(),
                     const SizedBox(height: 16),
                     GoogleButton(
+                      isDisabled: loading,
                       onPressed: () =>
                           context.read<AuthCubit>().signInWithGoogle(),
                     ),
@@ -135,11 +135,9 @@ class _LoginViewState extends State<_LoginView> {
                     AuthFooterLink(
                       text: "Don't have an account?",
                       actionLabel: 'Sign Up',
-                      onTap: () => Navigator.pushReplacement(
+                      onTap: () => Navigator.pushReplacementNamed(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => const CreateAccountScreen(),
-                        ),
+                        AppRoutes.createAccount,
                       ),
                     ),
                   ],

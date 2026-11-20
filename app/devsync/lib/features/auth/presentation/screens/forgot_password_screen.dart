@@ -1,21 +1,23 @@
 import 'package:devsync/core/di/service_locator.dart';
+import 'package:devsync/core/routing/app_routes.dart';
 import 'package:devsync/core/shared/buttons/app_primary_button.dart';
+import 'package:devsync/core/shared/feedback/app_feedback.dart';
 import 'package:devsync/core/shared/input_fields/app_input_field.dart';
 import 'package:devsync/core/theme/app_colors.dart';
+import 'package:devsync/core/theme/app_styles.dart';
 import 'package:devsync/core/utils/validators.dart';
-import 'package:devsync/features/auth/business_logic/auth_cubit.dart';
-import 'package:devsync/features/auth/business_logic/auth_state.dart';
-import 'package:devsync/features/auth/utils/auth_navigation.dart';
-import 'package:devsync/features/auth/widgets/auth_app_bar.dart';
-import 'package:devsync/features/auth/widgets/auth_footer_link.dart';
-import 'package:devsync/features/auth/widgets/auth_header.dart';
-import 'package:devsync/features/auth/widgets/icon_badge.dart';
-import 'package:devsync/features/auth/widgets/info_box.dart';
+import 'package:devsync/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:devsync/features/auth/presentation/cubit/auth_state.dart';
+import 'package:devsync/features/auth/presentation/widgets/auth_app_bar.dart';
+import 'package:devsync/features/auth/presentation/widgets/auth_footer_link.dart';
+import 'package:devsync/features/auth/presentation/widgets/auth_header.dart';
+import 'package:devsync/features/auth/presentation/widgets/auth_navigation.dart';
+import 'package:devsync/features/auth/presentation/widgets/icon_badge.dart';
+import 'package:devsync/features/auth/presentation/widgets/info_box.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'check_inbox_screen.dart';
-
+// Forgot password screen to request a reset link.
 class ForgotPasswordScreen extends StatelessWidget {
   const ForgotPasswordScreen({super.key});
 
@@ -55,13 +57,14 @@ class _ForgotPasswordViewState extends State<_ForgotPasswordView> {
     final c = context.colors;
     return BlocConsumer<AuthCubit, AuthState>(
       listener: (context, state) {
-        if (state is AuthError) showAuthMessage(context, state.message);
+        if (state is AuthError) {
+          showAuthMessage(context, state.message, type: AppFeedbackType.error);
+        }
         if (state is PasswordResetSent) {
-          Navigator.push(
+          Navigator.pushNamed(
             context,
-            MaterialPageRoute(
-              builder: (_) => CheckInboxScreen(email: state.email),
-            ),
+            AppRoutes.checkInbox,
+            arguments: state.email,
           );
         }
       },
@@ -100,10 +103,11 @@ class _ForgotPasswordViewState extends State<_ForgotPasswordView> {
                       children: [
                         Icon(Icons.info_outline, size: 14, color: c.primary),
                         const SizedBox(width: 6),
-                        Text(
-                          'Make sure you have access to this email inbox.',
-                          style:
-                              TextStyle(fontSize: 12, color: c.textSecondary),
+                        Expanded(
+                          child: Text(
+                            'Make sure you have access to this email inbox.',
+                            style: AppStyles.body12Secondary(context),
+                          ),
                         ),
                       ],
                     ),

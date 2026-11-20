@@ -1,13 +1,12 @@
+import 'package:devsync/core/routing/app_routes.dart';
 import 'package:devsync/core/shared/buttons/app_primary_button.dart';
 import 'package:devsync/core/shared/buttons/app_secondary_button.dart';
 import 'package:devsync/core/theme/app_colors.dart';
-import 'package:devsync/features/auth/widgets/icon_badge.dart';
+import 'package:devsync/core/theme/app_styles.dart';
+import 'package:devsync/features/auth/presentation/widgets/icon_badge.dart';
 import 'package:flutter/material.dart';
 
-import 'create_account_screen.dart';
-import 'login_screen.dart';
-
-/// Call from anywhere: showLoginRequiredSheet(context);
+// Modal bottom sheet prompting guests to log in or create an account.
 Future<void> showLoginRequiredSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
@@ -34,19 +33,12 @@ Future<void> showLoginRequiredSheet(BuildContext context) {
             const SizedBox(height: 24),
             const IconBadge(icon: Icons.lock_outline, size: 56, circular: true),
             const SizedBox(height: 16),
-            Text(
-              'Log in to continue',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: c.textPrimary,
-              ),
-            ),
+            Text('Log in to continue', style: AppStyles.h3(sheetContext)),
             const SizedBox(height: 8),
             Text(
               'Create an account or log in to join projects, save repositories, and message developers.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, height: 1.4, color: c.textSecondary),
+              style: AppStyles.body14Secondary(sheetContext),
             ),
             const SizedBox(height: 28),
             SizedBox(
@@ -57,10 +49,7 @@ Future<void> showLoginRequiredSheet(BuildContext context) {
                 isDisabled: false,
                 onPressed: () {
                   Navigator.pop(sheetContext);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  );
+                  Navigator.pushNamed(context, AppRoutes.login);
                 },
               ),
             ),
@@ -71,12 +60,7 @@ Future<void> showLoginRequiredSheet(BuildContext context) {
                 buttonText: 'Create Account',
                 onPressed: () {
                   Navigator.pop(sheetContext);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const CreateAccountScreen(),
-                    ),
-                  );
+                  Navigator.pushNamed(context, AppRoutes.createAccount);
                 },
               ),
             ),
@@ -85,7 +69,7 @@ Future<void> showLoginRequiredSheet(BuildContext context) {
               onPressed: () => Navigator.pop(sheetContext),
               child: Text(
                 'Not now',
-                style: TextStyle(fontSize: 14, color: c.textPrimary),
+                style: AppStyles.body14Primary(sheetContext),
               ),
             ),
           ],

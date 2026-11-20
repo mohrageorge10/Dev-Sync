@@ -1,22 +1,23 @@
 import 'package:devsync/core/di/service_locator.dart';
+import 'package:devsync/core/routing/app_routes.dart';
 import 'package:devsync/core/shared/buttons/app_primary_button.dart';
+import 'package:devsync/core/shared/feedback/app_feedback.dart';
 import 'package:devsync/core/shared/input_fields/app_input_field.dart';
 import 'package:devsync/core/utils/validators.dart';
-import 'package:devsync/features/auth/business_logic/auth_cubit.dart';
-import 'package:devsync/features/auth/business_logic/auth_state.dart';
-import 'package:devsync/features/auth/utils/auth_navigation.dart';
-import 'package:devsync/features/auth/widgets/auth_back_button.dart';
-import 'package:devsync/features/auth/widgets/auth_footer_link.dart';
-import 'package:devsync/features/auth/widgets/auth_header.dart';
-import 'package:devsync/features/auth/widgets/google_button.dart';
-import 'package:devsync/features/auth/widgets/or_divider.dart';
-import 'package:devsync/features/auth/widgets/password_field.dart';
-import 'package:devsync/features/auth/widgets/terms_checkbox.dart';
+import 'package:devsync/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:devsync/features/auth/presentation/cubit/auth_state.dart';
+import 'package:devsync/features/auth/presentation/widgets/auth_back_button.dart';
+import 'package:devsync/features/auth/presentation/widgets/auth_footer_link.dart';
+import 'package:devsync/features/auth/presentation/widgets/auth_header.dart';
+import 'package:devsync/features/auth/presentation/widgets/auth_navigation.dart';
+import 'package:devsync/features/auth/presentation/widgets/google_button.dart';
+import 'package:devsync/features/auth/presentation/widgets/or_divider.dart';
+import 'package:devsync/features/auth/presentation/widgets/password_field.dart';
+import 'package:devsync/features/auth/presentation/widgets/terms_checkbox.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import 'login_screen.dart';
-
+// Registration screen with form validation and Google sign-up.
 class CreateAccountScreen extends StatelessWidget {
   const CreateAccountScreen({super.key});
 
@@ -59,6 +60,7 @@ class _CreateAccountViewState extends State<_CreateAccountView> {
       showAuthMessage(
         context,
         'Please agree to the Terms of Service and Privacy Policy.',
+        type: AppFeedbackType.warning,
       );
       return;
     }
@@ -73,7 +75,9 @@ class _CreateAccountViewState extends State<_CreateAccountView> {
   Widget build(BuildContext context) {
     return BlocConsumer<AuthCubit, AuthState>(
       listener: (context, state) {
-        if (state is AuthError) showAuthMessage(context, state.message);
+        if (state is AuthError) {
+          showAuthMessage(context, state.message, type: AppFeedbackType.error);
+        }
         if (state is AuthSuccess) onAuthenticated(context);
       },
       builder: (context, state) {
@@ -121,6 +125,7 @@ class _CreateAccountViewState extends State<_CreateAccountView> {
                       label: 'Password',
                       hint: 'Create a strong password',
                       textInputAction: TextInputAction.next,
+                      enabled: !loading,
                       validator: AppValidators.validatePassword,
                     ),
                     const SizedBox(height: 16),
@@ -130,6 +135,7 @@ class _CreateAccountViewState extends State<_CreateAccountView> {
                       hint: 'Re-enter your password',
                       prefixIcon: Icons.lock_clock_outlined,
                       textInputAction: TextInputAction.done,
+                      enabled: !loading,
                       validator: (v) => AppValidators.validateConfirmPassword(
                         v,
                         _passCtrl.text,
@@ -154,6 +160,7 @@ class _CreateAccountViewState extends State<_CreateAccountView> {
                     const OrDivider(text: 'or continue with google'),
                     const SizedBox(height: 16),
                     GoogleButton(
+                      isDisabled: loading,
                       onPressed: () =>
                           context.read<AuthCubit>().signInWithGoogle(),
                     ),
@@ -161,9 +168,9 @@ class _CreateAccountViewState extends State<_CreateAccountView> {
                     AuthFooterLink(
                       text: 'Already have an account?',
                       actionLabel: 'Log In',
-                      onTap: () => Navigator.pushReplacement(
+                      onTap: () => Navigator.pushReplacementNamed(
                         context,
-                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                        AppRoutes.login,
                       ),
                     ),
                     const SizedBox(height: 16),

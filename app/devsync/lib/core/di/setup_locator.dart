@@ -3,6 +3,8 @@ import 'package:devsync/core/networking/api/api_consumer.dart';
 import 'package:devsync/core/networking/api/dio_consumer.dart';
 import 'package:devsync/core/services/firebase/firebase_auth_service.dart';
 import 'package:devsync/core/services/firebase/firestore_service.dart';
+import 'package:devsync/features/auth/data/repositories/auth_repository.dart';
+import 'package:devsync/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:devsync/features/create_project/data/repositories/builders_repository.dart';
 import 'package:devsync/features/create_project/data/repositories/project_repository.dart';
 import 'package:dio/dio.dart';
@@ -23,6 +25,17 @@ void setupLocator() {
   );
   ServiceLocator.registerLazySingleton<FirestoreService>(
     () => FirestoreService(),
+  );
+
+  // Auth Repository & Cubit
+  ServiceLocator.registerLazySingleton<AuthRepository>(
+    () => AuthRepository(
+      authService: ServiceLocator.get<FirebaseAuthService>(),
+      firestoreService: ServiceLocator.get<FirestoreService>(),
+    ),
+  );
+  ServiceLocator.registerFactory<AuthCubit>(
+    () => AuthCubit(ServiceLocator.get<AuthRepository>()),
   );
 
   // Create Project Repositories

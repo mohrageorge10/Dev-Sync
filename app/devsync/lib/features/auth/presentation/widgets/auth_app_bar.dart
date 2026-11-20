@@ -1,7 +1,8 @@
 import 'package:devsync/core/theme/app_colors.dart';
+import 'package:devsync/core/theme/app_styles.dart';
 import 'package:flutter/material.dart';
 
-/// AppBar used by Forgot Password and Check Inbox screens.
+// App bar used across auth secondary screens.
 class AuthAppBar extends StatelessWidget implements PreferredSizeWidget {
   const AuthAppBar({super.key, required this.title});
 
@@ -17,20 +18,13 @@ class AuthAppBar extends StatelessWidget implements PreferredSizeWidget {
       backgroundColor: c.backgroundPrimary,
       surfaceTintColor: Colors.transparent,
       elevation: 1,
-      shadowColor: Colors.black12,
+      shadowColor: AppColors.ambientShadow,
       toolbarHeight: 64,
       leading: IconButton(
         icon: Icon(Icons.arrow_back, color: c.textPrimary),
         onPressed: () => Navigator.maybePop(context),
       ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 17,
-          fontWeight: FontWeight.w600,
-          color: c.textPrimary,
-        ),
-      ),
+      title: Text(title, style: AppStyles.title17SemiBold(context)),
     );
   }
 }
