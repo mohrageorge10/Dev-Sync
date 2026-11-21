@@ -119,7 +119,7 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/logo.png"
+  image_path: "assets/images/light_logo.png"
   min_sdk_android: 21
 
 flutter_assets:

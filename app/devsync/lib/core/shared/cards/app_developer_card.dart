@@ -1,7 +1,9 @@
 import 'package:devsync/core/shared/badges/app_badge.dart';
 import 'package:devsync/core/theme/app_colors.dart';
+import 'package:devsync/core/theme/app_styles.dart';
 import 'package:flutter/material.dart';
 
+// Developer profile summary card.
 class DeveloperProfileCard extends StatelessWidget {
   const DeveloperProfileCard({
     super.key,
@@ -24,6 +26,9 @@ class DeveloperProfileCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final hasAvatar = avatarUrl.trim().isNotEmpty;
+    final avatarColor = AppColors.avatarColorFor(name);
+    final initial = name.trim().isNotEmpty ? name.trim()[0].toUpperCase() : '?';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -37,30 +42,29 @@ class DeveloperProfileCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              CircleAvatar(radius: 32, backgroundImage: NetworkImage(avatarUrl)),
+              CircleAvatar(
+                radius: 32,
+                backgroundColor:
+                    hasAvatar ? c.subtleBlueSurface : c.subtle(avatarColor),
+                backgroundImage: hasAvatar ? NetworkImage(avatarUrl) : null,
+                child: hasAvatar
+                    ? null
+                    : Text(
+                        initial,
+                        style: AppStyles.avatarInitials(32, avatarColor),
+                      ),
+              ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name,
-                        style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: c.textPrimary)),
+                    Text(name, style: AppStyles.h3(context)),
                     Text('@$username',
-                        style: TextStyle(fontSize: 14, color: c.textSecondary)),
+                        style: AppStyles.body14Secondary(context)),
                   ],
                 ),
               ),
-              if (githubConnected)
-                AppBadge(
-                  label: 'GitHub',
-                  icon: Icons.code,
-                  color: c.textSecondary,
-                  backgroundColor: c.backgroundPrimary,
-                  showBorder: true,
-                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -69,11 +73,10 @@ class DeveloperProfileCard extends StatelessWidget {
               Icon(Icons.terminal_rounded, size: 20, color: c.primary),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(title,
-                    style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: c.primary)),
+                child: Text(
+                  title,
+                  style: AppStyles.title16SemiBold(context, color: c.primary),
+                ),
               ),
             ],
           ),
@@ -101,15 +104,16 @@ class DeveloperProfileCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text.rich(
-                TextSpan(children: [
-                  TextSpan(
-                    text: '$matchPercent% Team Compatibility ',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w700, color: c.primary),
-                  ),
-                  TextSpan(text: matchReason),
-                ]),
-                style: TextStyle(fontSize: 14, color: c.textPrimary),
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '$matchPercent% Team Compatibility ',
+                      style: AppStyles.body14Bold(context, color: c.primary),
+                    ),
+                    TextSpan(text: matchReason),
+                  ],
+                ),
+                style: AppStyles.body13Primary(context),
               ),
             ),
           ],

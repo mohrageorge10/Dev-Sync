@@ -37,6 +37,12 @@ class AppStyles {
     color: context.colors.textPrimary,
   );
 
+  static TextStyle h28(BuildContext context) => TextStyle(
+    fontSize: 28,
+    fontWeight: FontWeight.w700,
+    color: context.colors.textPrimary,
+  );
+
   static TextStyle h26(BuildContext context) => TextStyle(
     fontSize: 26,
     fontWeight: FontWeight.w800,
@@ -55,11 +61,24 @@ class AppStyles {
     color: context.colors.textPrimary,
   );
 
+  static TextStyle h20(BuildContext context) => TextStyle(
+    fontSize: 20,
+    fontWeight: FontWeight.w700,
+    color: context.colors.textPrimary,
+  );
+
   static TextStyle h3(BuildContext context) => TextStyle(
     fontSize: 18,
     fontWeight: FontWeight.w800,
     color: context.colors.textPrimary,
   );
+
+  static TextStyle title17Bold(BuildContext context, {Color? color}) =>
+      TextStyle(
+        fontSize: 17,
+        fontWeight: FontWeight.w800,
+        color: color ?? context.colors.textPrimary,
+      );
 
   static TextStyle title17SemiBold(BuildContext context, {Color? color}) =>
       TextStyle(
@@ -73,6 +92,13 @@ class AppStyles {
       TextStyle(
         fontSize: 16,
         fontWeight: FontWeight.w700,
+        color: color ?? context.colors.textPrimary,
+      );
+
+  static TextStyle title16SemiBold(BuildContext context, {Color? color}) =>
+      TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w600,
         color: color ?? context.colors.textPrimary,
       );
 
@@ -105,7 +131,7 @@ class AppStyles {
 
   static TextStyle body14Secondary(BuildContext context) => TextStyle(
     fontSize: 14,
-    height: 1.45,
+    height: 1.4,
     color: context.colors.textSecondary,
   );
 
@@ -125,6 +151,19 @@ class AppStyles {
         fontWeight: FontWeight.w700,
         color: color ?? context.colors.textPrimary,
       );
+
+  static TextStyle body13SemiBold(BuildContext context, {Color? color}) =>
+      TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: color ?? context.colors.textPrimary,
+      );
+
+  static TextStyle body13Primary(BuildContext context) => TextStyle(
+    fontSize: 13,
+    height: 1.35,
+    color: context.colors.textPrimary,
+  );
 
   static TextStyle body13Secondary(BuildContext context) => TextStyle(
     fontSize: 13,

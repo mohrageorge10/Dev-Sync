@@ -1,6 +1,9 @@
+import 'package:devsync/core/animations/app_animations.dart';
 import 'package:devsync/core/theme/app_colors.dart';
+import 'package:devsync/core/theme/app_styles.dart';
 import 'package:flutter/material.dart';
 
+// Segmented tab switcher.
 class AppSegmentedControl extends StatelessWidget {
   const AppSegmentedControl({
     super.key,
@@ -31,7 +34,9 @@ class AppSegmentedControl extends StatelessWidget {
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => onChanged(i),
-                child: Container(
+                child: AnimatedContainer(
+                  duration: AppAnimations.fast,
+                  curve: AppAnimations.easeOut,
                   height: 40,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
@@ -45,11 +50,8 @@ class AppSegmentedControl extends StatelessWidget {
                   ),
                   child: Text(
                     labels[i],
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: i == selectedIndex
-                          ? FontWeight.w600
-                          : FontWeight.w500,
+                    style: AppStyles.label14SemiBold(
+                      context,
                       color: i == selectedIndex
                           ? c.textPrimary
                           : c.textSecondary,

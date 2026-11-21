@@ -1,3 +1,4 @@
+import 'package:devsync/core/constants/app_images.dart';
 import 'package:devsync/core/di/service_locator.dart';
 import 'package:devsync/core/shared/buttons/app_primary_button.dart';
 import 'package:devsync/core/shared/buttons/app_secondary_button.dart';
@@ -7,6 +8,7 @@ import 'package:devsync/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:devsync/features/auth/presentation/cubit/auth_state.dart';
 import 'package:devsync/features/auth/presentation/widgets/auth_app_bar.dart';
 import 'package:devsync/features/auth/presentation/widgets/auth_navigation.dart';
+import 'package:devsync/features/auth/presentation/widgets/icon_badge.dart';
 import 'package:devsync/features/auth/presentation/widgets/info_box.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -56,9 +58,14 @@ class _CheckInboxView extends StatelessWidget {
               child: Column(
                 children: [
                   Image.asset(
-                    'assets/images/check_inbox_illustration.png',
+                    AppImages.checkInboxIllustration,
                     width: 224,
                     fit: BoxFit.contain,
+                    errorBuilder: (_, _, _) => const IconBadge(
+                      icon: Icons.mark_email_read_outlined,
+                      size: 96,
+                      circular: true,
+                    ),
                   ),
                   const SizedBox(height: 40),
                   Text('Check your inbox', style: AppStyles.h26(context)),

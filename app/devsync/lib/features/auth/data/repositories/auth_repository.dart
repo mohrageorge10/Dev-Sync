@@ -76,6 +76,14 @@ class AuthRepository {
 
   // Google sign-in; returns null if cancelled by the user.
   Future<UserModel?> signInWithGoogle() async {
+    if (!kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.linux)) {
+      throw const AuthException(
+        'Google Sign-In is only available on Android, iOS, and Web. Please use Email & Password on desktop.',
+      );
+    }
+
     try {
       return await _guard(() async {
         final user = await _auth.signInWithGoogle();

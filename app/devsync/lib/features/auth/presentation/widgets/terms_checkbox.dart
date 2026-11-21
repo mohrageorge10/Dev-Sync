@@ -1,9 +1,11 @@
+import 'package:devsync/core/routing/app_routes.dart';
 import 'package:devsync/core/theme/app_colors.dart';
 import 'package:devsync/core/theme/app_styles.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
-// Terms of Service and Privacy Policy agreement checkbox.
-class TermsCheckbox extends StatelessWidget {
+// Terms of Service and Privacy Policy agreement checkbox with clickable links.
+class TermsCheckbox extends StatefulWidget {
   const TermsCheckbox({
     super.key,
     required this.value,
@@ -12,6 +14,24 @@ class TermsCheckbox extends StatelessWidget {
 
   final bool value;
   final ValueChanged<bool> onChanged;
+
+  @override
+  State<TermsCheckbox> createState() => _TermsCheckboxState();
+}
+
+class _TermsCheckboxState extends State<TermsCheckbox> {
+  late final TapGestureRecognizer _termsTap = TapGestureRecognizer()
+    ..onTap = () => Navigator.pushNamed(context, AppRoutes.termsOfService);
+
+  late final TapGestureRecognizer _privacyTap = TapGestureRecognizer()
+    ..onTap = () => Navigator.pushNamed(context, AppRoutes.privacyPolicy);
+
+  @override
+  void dispose() {
+    _termsTap.dispose();
+    _privacyTap.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +44,7 @@ class TermsCheckbox extends StatelessWidget {
           width: 24,
           height: 24,
           child: Checkbox(
-            value: value,
+            value: widget.value,
             checkColor: c.onPrimary,
             side: BorderSide(color: c.border),
             fillColor: WidgetStateProperty.resolveWith(
@@ -35,7 +55,7 @@ class TermsCheckbox extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(6),
             ),
-            onChanged: (v) => onChanged(v ?? false),
+            onChanged: (v) => widget.onChanged(v ?? false),
           ),
         ),
         const SizedBox(width: 10),
@@ -45,9 +65,17 @@ class TermsCheckbox extends StatelessWidget {
               style: AppStyles.body12Primary(context),
               children: [
                 const TextSpan(text: 'I agree to the '),
-                TextSpan(text: 'Terms of Service', style: link),
+                TextSpan(
+                  text: 'Terms of Service',
+                  style: link,
+                  recognizer: _termsTap,
+                ),
                 const TextSpan(text: ' and '),
-                TextSpan(text: 'Privacy Policy', style: link),
+                TextSpan(
+                  text: 'Privacy Policy',
+                  style: link,
+                  recognizer: _privacyTap,
+                ),
               ],
             ),
           ),

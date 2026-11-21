@@ -7,6 +7,8 @@ import 'package:devsync/features/auth/data/repositories/auth_repository.dart';
 import 'package:devsync/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:devsync/features/create_project/data/repositories/builders_repository.dart';
 import 'package:devsync/features/create_project/data/repositories/project_repository.dart';
+import 'package:devsync/features/discover_project/data/repositories/discover_repository.dart';
+import 'package:devsync/features/discover_project/presentation/cubit/discover/discover_cubit.dart';
 import 'package:dio/dio.dart';
 
 void setupLocator() {
@@ -51,5 +53,16 @@ void setupLocator() {
       authService: ServiceLocator.get<FirebaseAuthService>(),
       buildersRepository: ServiceLocator.get<BuildersRepository>(),
     ),
+  );
+
+  // Discover Repository & Shared Cubit
+  ServiceLocator.registerLazySingleton<DiscoverRepository>(
+    () => DiscoverRepository(
+      firestoreService: ServiceLocator.get<FirestoreService>(),
+      authService: ServiceLocator.get<FirebaseAuthService>(),
+    ),
+  );
+  ServiceLocator.registerLazySingleton<DiscoverCubit>(
+    () => DiscoverCubit(repository: ServiceLocator.get<DiscoverRepository>()),
   );
 }
