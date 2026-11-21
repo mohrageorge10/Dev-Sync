@@ -164,3 +164,18 @@ class AppColors extends ThemeExtension<AppColors> {
 extension AppColorsX on BuildContext {
   AppColors get colors => Theme.of(this).extension<AppColors>()!;
 }
+
+/// Static color constants matching the application design tokens.
+/// Useful for compile-time constants, default widget parameters, and static contexts.
+abstract final class AppPalette {
+  static const Color primary = Color(0xFF315BDB);
+  static const Color softBlue = Color(0xFFEEF3FF);
+  static const Color success = Color(0xFF16845B);
+  static const Color danger = Color(0xFFC43D4B);
+  static const Color dangerBg = Color(0xFFFDE8EA);
+  static const Color muted = Color(0xFF65718A);
+  static const Color text = Color(0xFF17233D);
+  static const Color surface = Color(0xFFFFFFFF);
+  static const Color border = Color(0xFFDDE4F2);
+  static const Color fieldBg = Color(0xFFF5F7FC);
+}

@@ -13,4 +13,13 @@ class AppRoutes {
   // ============== Create Project ===============
   static const String createProject = '/create-project';
   // ============== Profile ===============
+
+  // ============== My Teams ===============
+  static const String myTeams        = '/my-teams';
+  static const String teamWorkspace  = '/team-workspace';
+  static const String taskBoard      = '/task-board';
+  static const String teamMembers    = '/team-members';
+  static const String taskDetails    = '/task-details';
+  static const String taskCreate     = '/task-create';
+  static const String taskEdit       = '/task-edit';
 }
