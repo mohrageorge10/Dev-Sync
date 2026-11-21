@@ -17,20 +17,22 @@ class AppTextButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onPressed,
-      child: SizedBox(
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          spacing: 5,
-          children: [
-            if (leadingIcon != null)
-              Icon(leadingIcon, color: Color(0xff0340C2)),
-            Text(buttonText, style: AppStyles.lightPrimary_16_500),
-            if (trailingIcon != null)
-              Icon(trailingIcon, color: Color(0xff0340C2)),
-          ],
-        ),
+    return TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(
+        minimumSize: const Size(0, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        spacing: 5,
+        children: [
+          if (leadingIcon != null) Icon(leadingIcon, color: Color(0xff0340C2)),
+          Text(buttonText, style: AppStyles.lightPrimary_16_500),
+          if (trailingIcon != null)
+            Icon(trailingIcon, color: Color(0xff0340C2)),
+        ],
       ),
     );
   }

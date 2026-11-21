@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 /// Usage:
-///   final c = context.colors;   // or Theme.of(context).extension<AppColors>()!
+///   final c = context.colors;   // or `Theme.of(context).extension<AppColors>()!`
 ///   Container(color: c.surface);
 @immutable
 class AppColors extends ThemeExtension<AppColors> {

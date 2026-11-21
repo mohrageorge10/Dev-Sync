@@ -54,6 +54,7 @@ dependencies:
   # Images
   flutter_svg: ^2.3.0
   image_picker: ^1.2.4
+  file_selector: ^1.0.3
   # NFR-04 protect keys
   flutter_dotenv: ^6.0.1
   # Dependency Injection

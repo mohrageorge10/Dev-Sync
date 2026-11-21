@@ -49,7 +49,7 @@ class AppDropdownField<T> extends StatelessWidget {
           const SizedBox(height: 8),
         ],
         DropdownButtonFormField<T>(
-          value: value,
+          initialValue: value,
           validator: validator,
           onChanged: onChanged,
           isExpanded: true,

@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 
 class AppStyles {
   AppStyles._();
-
   static const white_14_500 = TextStyle(
     color: Colors.white,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: FontWeight.w500,
   );
 
@@ -28,4 +27,11 @@ class AppStyles {
   );
 
   // ========================================
+  static const primary_28_700= TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Color(0XFF0F1C31),
+              );
+
+  static const gray_14= TextStyle(fontSize: 14, color: Color(0XFF434654));
 }

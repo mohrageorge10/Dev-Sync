@@ -9,9 +9,13 @@ class AppInputField extends StatefulWidget {
     this.trailingLabel,
     this.hint,
     this.prefixIcon,
+    this.suffixIcon,
     this.validator,
     this.keyboardType,
     this.textInputAction,
+    this.maxLines = 1,
+    this.maxLength,
+    this.counterText,
     this.obscureText = false,
     this.enabled = true,
     this.onChanged,
@@ -27,12 +31,16 @@ class AppInputField extends StatefulWidget {
 
   final String? hint;
   final IconData? prefixIcon;
+  final Widget? suffixIcon;
 
   /// Return an error message, or null when the value is valid.
   final String? Function(String value)? validator;
 
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
+  final int maxLines;
+  final int? maxLength;
+  final String? counterText;
   final bool obscureText;
   final bool enabled;
   final ValueChanged<String>? onChanged;
@@ -87,6 +95,8 @@ class _AppInputFieldState extends State<AppInputField> {
         Widget? suffix;
         if (hasError) {
           suffix = Icon(Icons.error_outline_rounded, color: c.error, size: 24);
+        } else if (widget.suffixIcon != null) {
+          suffix = widget.suffixIcon;
         } else if (focused && hasText) {
           suffix =
               Icon(Icons.check_circle_outline_rounded, color: c.primary, size: 24);
@@ -133,6 +143,8 @@ class _AppInputFieldState extends State<AppInputField> {
               obscureText: widget.obscureText,
               keyboardType: widget.keyboardType,
               textInputAction: widget.textInputAction,
+              maxLines: widget.maxLines,
+              maxLength: widget.maxLength,
               cursorColor: accent ?? c.primary,
               style: TextStyle(
                 fontSize: 16,
@@ -150,6 +162,7 @@ class _AppInputFieldState extends State<AppInputField> {
                   height: 24 / 16,
                   color: c.textSecondary,
                 ),
+                counterText: widget.counterText,
                 filled: true,
                 // Focused / error: white background, otherwise surface.
                 fillColor:

@@ -1,5 +1,3 @@
-import 'package:devsync/core/constants/app_constants.dart';
-import 'package:devsync/core/database/cache.dart';
 import 'package:devsync/core/shared/badges/app_badge.dart';
 import 'package:devsync/core/shared/buttons/app_primary_button.dart';
 import 'package:devsync/core/shared/buttons/app_secondary_button.dart';
