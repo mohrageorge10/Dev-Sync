@@ -1,6 +1,7 @@
 import 'package:devsync/core/animations/app_page_route.dart';
 import 'package:devsync/core/routing/app_routes.dart';
-import 'package:devsync/core/shared/app_bar/devsync_logo.dart';
+import 'package:devsync/core/static/on_boarding/screens/on_boarding.dart';
+import 'package:devsync/core/static/splash/Splash.dart';
 import 'package:devsync/features/auth/presentation/screens/auth_entry_screen.dart';
 import 'package:devsync/features/auth/presentation/screens/check_inbox_screen.dart';
 import 'package:devsync/features/auth/presentation/screens/create_account_screen.dart';
@@ -22,10 +23,11 @@ class AppRouter {
   Route generateRoute(RouteSettings settings) {
     switch (settings.name) {
       case AppRoutes.splash:
+        return AppPageRoute(builder: (_) => const Splash(), settings: settings);
+
+      case AppRoutes.onBoarding:
         return AppPageRoute(
-          builder: (_) => const Scaffold(
-            body: Center(child: DevSyncLogo(size: 140)),
-          ),
+          builder: (_) => const OnboardingScreen(),
           settings: settings,
         );
 
@@ -54,8 +56,9 @@ class AppRouter {
         );
 
       case AppRoutes.checkInbox:
-        final email =
-            settings.arguments is String ? settings.arguments as String : '';
+        final email = settings.arguments is String
+            ? settings.arguments as String
+            : '';
         return AppPageRoute(
           builder: (_) => CheckInboxScreen(email: email),
           settings: settings,
@@ -86,8 +89,9 @@ class AppRouter {
         );
 
       case AppRoutes.discoverSearch:
-        final initialTab =
-            settings.arguments is int ? settings.arguments as int : 0;
+        final initialTab = settings.arguments is int
+            ? settings.arguments as int
+            : 0;
         return AppPageRoute(
           builder: (_) => SearchScreen(initialTab: initialTab),
           settings: settings,
@@ -111,9 +115,8 @@ class AppRouter {
           );
         }
         return AppPageRoute(
-          builder: (_) => const Scaffold(
-            body: Center(child: Text('Missing profile data')),
-          ),
+          builder: (_) =>
+              const Scaffold(body: Center(child: Text('Missing profile data'))),
           settings: settings,
         );
 
@@ -126,17 +129,15 @@ class AppRouter {
           );
         }
         return AppPageRoute(
-          builder: (_) => const Scaffold(
-            body: Center(child: Text('Missing project data')),
-          ),
+          builder: (_) =>
+              const Scaffold(body: Center(child: Text('Missing project data'))),
           settings: settings,
         );
 
       case AppRoutes.createProject:
         return AppPageRoute(
-          builder: (_) => const CreateProjectProviders(
-            child: CreateProjectScreen(),
-          ),
+          builder: (_) =>
+              const CreateProjectProviders(child: CreateProjectScreen()),
           settings: settings,
         );
 
