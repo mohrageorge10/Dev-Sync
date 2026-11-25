@@ -54,10 +54,13 @@ dependencies:
   # Images
   flutter_svg: ^2.3.0
   image_picker: ^1.2.4
+  file_selector: ^1.0.3
   # NFR-04 protect keys
   flutter_dotenv: ^6.0.1
   # Dependency Injection
   get_it: ^9.3.0
+  syncfusion_flutter_pdfviewer: ^35.2.12
+  permission_handler: ^13.0.2
 
 dev_dependencies:
   flutter_test:
@@ -119,7 +122,7 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/logo.png"
+  image_path: "assets/images/light_logo.png"
   min_sdk_android: 21
 
 flutter_assets:

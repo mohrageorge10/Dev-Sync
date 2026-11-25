@@ -21,39 +21,54 @@ class AppPrimaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return GestureDetector(
-      onTap: isDisabled ? null : onPressed,
-      child: Container(
-        decoration: BoxDecoration(
-          color: isDisabled ? c.subtleBlueSurface : c.primary,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            spacing: 5,
-            children: [
-              if (leadingIcon != null)
-                Icon(
-                  leadingIcon,
-                  color: isDisabled ? c.textSecondary : c.onPrimary,
-                ),
-              Text(
-                buttonText,
-                style: isDisabled
-                    ? AppStyles.gray_16_500(context)
-                    : AppStyles.white_14_500(context),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final label = Text(
+          buttonText,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: isDisabled
+              ? AppStyles.gray_16_500(context)
+              : AppStyles.white_14_500(context),
+        );
+        return GestureDetector(
+          onTap: isDisabled ? null : onPressed,
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDisabled ? c.subtleBlueSurface : c.primary,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+              child: Row(
+                mainAxisSize: constraints.hasBoundedWidth
+                    ? MainAxisSize.max
+                    : MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                spacing: 6,
+                children: [
+                  if (leadingIcon != null)
+                    Icon(
+                      leadingIcon,
+                      size: 18,
+                      color: isDisabled ? c.textSecondary : c.onPrimary,
+                    ),
+                  if (constraints.hasBoundedWidth)
+                    Flexible(child: label)
+                  else
+                    label,
+                  if (trailingIcon != null)
+                    Icon(
+                      trailingIcon,
+                      size: 18,
+                      color: isDisabled ? c.textSecondary : c.onPrimary,
+                    ),
+                ],
               ),
-              if (trailingIcon != null)
-                Icon(
-                  trailingIcon,
-                  color: isDisabled ? c.textSecondary : c.onPrimary,
-                ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

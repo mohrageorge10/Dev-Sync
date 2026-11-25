@@ -3,8 +3,10 @@ import 'package:devsync/core/shared/badges/app_badge.dart';
 import 'package:devsync/core/shared/buttons/app_primary_button.dart';
 import 'package:devsync/core/shared/chips/app_skill_chip.dart';
 import 'package:devsync/core/theme/app_colors.dart';
+import 'package:devsync/core/theme/app_styles.dart';
 import 'package:flutter/material.dart';
 
+// Project overview card.
 class AppProjectCard extends StatelessWidget {
   const AppProjectCard({
     super.key,
@@ -24,11 +26,7 @@ class AppProjectCard extends StatelessWidget {
   final int members;
   final int capacity;
   final VoidCallback onViewProject;
-
-  /// true = REAL-WORLD badge, false = LEARNING badge.
   final bool isRealWorld;
-
-  /// Shows "89% Match" when not null.
   final int? matchPercent;
 
   bool get _isFull => members >= capacity;
@@ -47,7 +45,7 @@ class AppProjectCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Purpose + match
+          // Purpose and match badges.
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -66,28 +64,13 @@ class AppProjectCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Title + description
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 22,
-              height: 28 / 22,
-              fontWeight: FontWeight.w700,
-              color: c.textPrimary,
-            ),
-          ),
+          // Title and description.
+          Text(title, style: AppStyles.h2(context)),
           const SizedBox(height: 8),
-          Text(
-            description,
-            style: TextStyle(
-              fontSize: 16,
-              height: 24 / 16,
-              color: c.textSecondary,
-            ),
-          ),
+          Text(description, style: AppStyles.body14Secondary(context)),
           const SizedBox(height: 16),
 
-          // Skills
+          // Required skills.
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -97,30 +80,31 @@ class AppProjectCard extends StatelessWidget {
           Divider(color: c.border, height: 1),
           const SizedBox(height: 16),
 
-          // Footer
+          // Capacity and action footer.
           Row(
             children: [
               Expanded(
-                child: Wrap(
-                  spacing: 12,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.group_outlined, size: 20, color: c.primary),
+                        Icon(Icons.group_outlined, size: 18, color: c.primary),
                         const SizedBox(width: 6),
-                        Text(
-                          '$members/$capacity members',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: c.textSecondary,
+                        Flexible(
+                          child: Text(
+                            '$members/$capacity members',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppStyles.label14SemiBold(
+                              context,
+                              color: c.textSecondary,
+                            ),
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 8),
                     _isFull
                         ? AppBadge.info(context, 'Full')
                         : AppBadge.success(context, 'Open'),
@@ -131,7 +115,7 @@ class AppProjectCard extends StatelessWidget {
               AppPrimaryButton(
                 buttonText: 'View Project',
                 trailingIcon: Icons.chevron_right_rounded,
-                isDisabled: false, // default is true in your button!
+                isDisabled: false,
                 onPressed: onViewProject,
               ),
             ],

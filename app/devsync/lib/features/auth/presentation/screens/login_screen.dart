@@ -1,3 +1,4 @@
+import 'package:devsync/core/animations/app_fade_slide.dart';
 import 'package:devsync/core/di/service_locator.dart';
 import 'package:devsync/core/routing/app_routes.dart';
 import 'package:devsync/core/shared/buttons/app_primary_button.dart';
@@ -79,65 +80,91 @@ class _LoginViewState extends State<_LoginView> {
                   children: [
                     const AuthBackButton(),
                     const SizedBox(height: 8),
-                    const AuthHeader(
-                      title: 'Welcome back',
-                      subtitle: 'Sign in to continue to DevSync.',
+                    const AppFadeSlide(
+                      offsetY: 22,
+                      child: AuthHeader(
+                        title: 'Welcome back',
+                        subtitle: 'Sign in to continue to DevSync.',
+                      ),
                     ),
                     const SizedBox(height: 32),
-                    AppInputField(
-                      controller: _emailCtrl,
-                      label: 'Email',
-                      hint: 'alex@example.com',
-                      prefixIcon: Icons.mail_outline,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      enabled: !loading,
-                      validator: AppValidators.validateEmail,
-                    ),
-                    const SizedBox(height: 16),
-                    PasswordField(
-                      controller: _passCtrl,
-                      label: 'Password',
-                      hint: 'Enter your password',
-                      textInputAction: TextInputAction.done,
-                      enabled: !loading,
-                      validator: AppValidators.validateLoginPassword,
-                    ),
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: AppTextButton(
-                        buttonText: 'Forgot Password?',
-                        onPressed: () => Navigator.pushNamed(
-                          context,
-                          AppRoutes.forgotPassword,
-                        ),
+                    AppFadeSlide(
+                      delay: const Duration(milliseconds: 70),
+                      offsetY: 22,
+                      child: AppInputField(
+                        controller: _emailCtrl,
+                        label: 'Email',
+                        hint: 'alex@example.com',
+                        prefixIcon: Icons.mail_outline,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        enabled: !loading,
+                        validator: AppValidators.validateEmail,
                       ),
                     ),
                     const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: AppPrimaryButton(
-                        buttonText: loading ? 'Please wait...' : 'Log In',
-                        isDisabled: loading,
-                        onPressed: _onLogin,
+                    AppFadeSlide(
+                      delay: const Duration(milliseconds: 140),
+                      offsetY: 22,
+                      child: PasswordField(
+                        controller: _passCtrl,
+                        label: 'Password',
+                        hint: 'Enter your password',
+                        textInputAction: TextInputAction.done,
+                        enabled: !loading,
+                        validator: AppValidators.validateLoginPassword,
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const OrDivider(),
-                    const SizedBox(height: 16),
-                    GoogleButton(
-                      isDisabled: loading,
-                      onPressed: () =>
-                          context.read<AuthCubit>().signInWithGoogle(),
+                    AppFadeSlide(
+                      delay: const Duration(milliseconds: 210),
+                      offsetY: 22,
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            child: AppPrimaryButton(
+                              buttonText: loading ? 'Please wait...' : 'Log In',
+                              isDisabled: loading,
+                              onPressed: _onLogin,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Center(
+                            child: AppTextButton(
+                              buttonText: 'Forgot Password?',
+                              onPressed: () => Navigator.pushNamed(
+                                context,
+                                AppRoutes.forgotPassword,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 28),
-                    AuthFooterLink(
-                      text: "Don't have an account?",
-                      actionLabel: 'Sign Up',
-                      onTap: () => Navigator.pushReplacementNamed(
-                        context,
-                        AppRoutes.createAccount,
+                    const SizedBox(height: 20),
+                    AppFadeSlide(
+                      delay: const Duration(milliseconds: 280),
+                      offsetY: 22,
+                      child: Column(
+                        children: [
+                          const OrDivider(),
+                          const SizedBox(height: 16),
+                          GoogleButton(
+                            isDisabled: loading,
+                            onPressed: () =>
+                                context.read<AuthCubit>().signInWithGoogle(),
+                          ),
+                          const SizedBox(height: 28),
+                          AuthFooterLink(
+                            text: "Don't have an account?",
+                            actionLabel: 'Sign Up',
+                            onTap: () => Navigator.pushReplacementNamed(
+                              context,
+                              AppRoutes.createAccount,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],

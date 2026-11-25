@@ -1,3 +1,4 @@
+import 'package:devsync/core/constants/app_images.dart';
 import 'package:devsync/core/theme/app_colors.dart';
 import 'package:devsync/core/theme/app_styles.dart';
 import 'package:flutter/material.dart';
@@ -32,11 +33,11 @@ class GoogleButton extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Image.asset(
-              'assets/images/google_logo.png',
+              AppImages.googleLogo,
               width: 20,
               height: 20,
               errorBuilder: (_, _, _) =>
-                  Icon(Icons.g_mobiledata, size: 26, color: c.error),
+                  Icon(Icons.g_mobiledata, size: 26, color: c.primary),
             ),
             const SizedBox(width: 10),
             Text(

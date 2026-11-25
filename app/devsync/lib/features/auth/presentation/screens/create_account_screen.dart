@@ -1,3 +1,4 @@
+import 'package:devsync/core/animations/app_fade_slide.dart';
 import 'package:devsync/core/di/service_locator.dart';
 import 'package:devsync/core/routing/app_routes.dart';
 import 'package:devsync/core/shared/buttons/app_primary_button.dart';
@@ -93,87 +94,122 @@ class _CreateAccountViewState extends State<_CreateAccountView> {
                   children: [
                     const AuthBackButton(),
                     const SizedBox(height: 8),
-                    const AuthHeader(
-                      title: 'Create your account',
-                      subtitle:
-                          'Join developers building meaningful projects together.',
+                    const AppFadeSlide(
+                      offsetY: 22,
+                      child: AuthHeader(
+                        title: 'Create your account',
+                        subtitle:
+                            'Join developers building meaningful projects together.',
+                      ),
                     ),
                     const SizedBox(height: 28),
-                    AppInputField(
-                      controller: _nameCtrl,
-                      label: 'Full name',
-                      hint: 'e.g. Alex Morgan',
-                      prefixIcon: Icons.person_outline,
-                      textInputAction: TextInputAction.next,
-                      enabled: !loading,
-                      validator: AppValidators.validateName,
-                    ),
-                    const SizedBox(height: 16),
-                    AppInputField(
-                      controller: _emailCtrl,
-                      label: 'Email',
-                      hint: 'alex@example.com',
-                      prefixIcon: Icons.mail_outline,
-                      keyboardType: TextInputType.emailAddress,
-                      textInputAction: TextInputAction.next,
-                      enabled: !loading,
-                      validator: AppValidators.validateEmail,
-                    ),
-                    const SizedBox(height: 16),
-                    PasswordField(
-                      controller: _passCtrl,
-                      label: 'Password',
-                      hint: 'Create a strong password',
-                      textInputAction: TextInputAction.next,
-                      enabled: !loading,
-                      validator: AppValidators.validatePassword,
-                    ),
-                    const SizedBox(height: 16),
-                    PasswordField(
-                      controller: _confirmCtrl,
-                      label: 'Confirm password',
-                      hint: 'Re-enter your password',
-                      prefixIcon: Icons.lock_clock_outlined,
-                      textInputAction: TextInputAction.done,
-                      enabled: !loading,
-                      validator: (v) => AppValidators.validateConfirmPassword(
-                        v,
-                        _passCtrl.text,
+                    AppFadeSlide(
+                      delay: const Duration(milliseconds: 60),
+                      offsetY: 22,
+                      child: AppInputField(
+                        controller: _nameCtrl,
+                        label: 'Full name',
+                        hint: 'e.g. Alex Morgan',
+                        prefixIcon: Icons.person_outline,
+                        textInputAction: TextInputAction.next,
+                        enabled: !loading,
+                        validator: AppValidators.validateName,
                       ),
                     ),
                     const SizedBox(height: 16),
-                    TermsCheckbox(
-                      value: _agreed,
-                      onChanged: (v) => setState(() => _agreed = v),
+                    AppFadeSlide(
+                      delay: const Duration(milliseconds: 120),
+                      offsetY: 22,
+                      child: AppInputField(
+                        controller: _emailCtrl,
+                        label: 'Email',
+                        hint: 'alex@example.com',
+                        prefixIcon: Icons.mail_outline,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        enabled: !loading,
+                        validator: AppValidators.validateEmail,
+                      ),
                     ),
                     const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: AppPrimaryButton(
-                        buttonText:
-                            loading ? 'Please wait...' : 'Create Account',
-                        isDisabled: loading,
-                        onPressed: _onCreateAccount,
+                    AppFadeSlide(
+                      delay: const Duration(milliseconds: 180),
+                      offsetY: 22,
+                      child: PasswordField(
+                        controller: _passCtrl,
+                        label: 'Password',
+                        hint: 'Create a strong password',
+                        textInputAction: TextInputAction.next,
+                        enabled: !loading,
+                        validator: AppValidators.validatePassword,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    AppFadeSlide(
+                      delay: const Duration(milliseconds: 240),
+                      offsetY: 22,
+                      child: PasswordField(
+                        controller: _confirmCtrl,
+                        label: 'Confirm password',
+                        hint: 'Re-enter your password',
+                        prefixIcon: Icons.lock_clock_outlined,
+                        textInputAction: TextInputAction.done,
+                        enabled: !loading,
+                        validator: (v) => AppValidators.validateConfirmPassword(
+                          v,
+                          _passCtrl.text,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    AppFadeSlide(
+                      delay: const Duration(milliseconds: 300),
+                      offsetY: 22,
+                      child: Column(
+                        children: [
+                          TermsCheckbox(
+                            value: _agreed,
+                            onChanged: (v) => setState(() => _agreed = v),
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: AppPrimaryButton(
+                              buttonText:
+                                  loading ? 'Please wait...' : 'Create Account',
+                              isDisabled: loading,
+                              onPressed: _onCreateAccount,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const OrDivider(text: 'or continue with google'),
-                    const SizedBox(height: 16),
-                    GoogleButton(
-                      isDisabled: loading,
-                      onPressed: () =>
-                          context.read<AuthCubit>().signInWithGoogle(),
-                    ),
-                    const SizedBox(height: 12),
-                    AuthFooterLink(
-                      text: 'Already have an account?',
-                      actionLabel: 'Log In',
-                      onTap: () => Navigator.pushReplacementNamed(
-                        context,
-                        AppRoutes.login,
+                    AppFadeSlide(
+                      delay: const Duration(milliseconds: 360),
+                      offsetY: 22,
+                      child: Column(
+                        children: [
+                          const OrDivider(text: 'or continue with google'),
+                          const SizedBox(height: 16),
+                          GoogleButton(
+                            isDisabled: loading,
+                            onPressed: () =>
+                                context.read<AuthCubit>().signInWithGoogle(),
+                          ),
+                          const SizedBox(height: 12),
+                          AuthFooterLink(
+                            text: 'Already have an account?',
+                            actionLabel: 'Log In',
+                            onTap: () => Navigator.pushReplacementNamed(
+                              context,
+                              AppRoutes.login,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 16),
                   ],
                 ),
               ),

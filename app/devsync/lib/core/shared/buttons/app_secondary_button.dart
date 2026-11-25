@@ -19,27 +19,45 @@ class AppSecondaryButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return GestureDetector(
-      onTap: onPressed,
-      child: Container(
-        decoration: BoxDecoration(
-          color: c.subtleBlueSurface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: c.border),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 20),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            spacing: 5,
-            children: [
-              if (leadingIcon != null) Icon(leadingIcon, color: c.textPrimary),
-              Text(buttonText, style: AppStyles.primary_16_500(context)),
-              if (trailingIcon != null) Icon(trailingIcon, color: c.textPrimary),
-            ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final label = Text(
+          buttonText,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppStyles.primary_16_500(context),
+        );
+        return GestureDetector(
+          onTap: onPressed,
+          child: Container(
+            decoration: BoxDecoration(
+              color: c.subtleBlueSurface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: c.border),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+              child: Row(
+                mainAxisSize: constraints.hasBoundedWidth
+                    ? MainAxisSize.max
+                    : MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                spacing: 6,
+                children: [
+                  if (leadingIcon != null)
+                    Icon(leadingIcon, size: 18, color: c.textPrimary),
+                  if (constraints.hasBoundedWidth)
+                    Flexible(child: label)
+                  else
+                    label,
+                  if (trailingIcon != null)
+                    Icon(trailingIcon, size: 18, color: c.textPrimary),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
