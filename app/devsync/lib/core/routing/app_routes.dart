@@ -1,18 +1,38 @@
-class AppRoutes 
-{
+class AppRoutes {
   AppRoutes._();
   static const String splash = '/splash';
   static const String onBoarding = '/on-boarding';
-   // ============== Profile ===============
-  static const basicInfo = '/profile/basic-info';
-  static const technical = '/profile/technical';
-  static const skills = '/profile/skills';
-  static const projects = '/profile/projects';
-  static const connectWork = '/profile/connect-work';
-  static const complete = '/profile/complete';
-  static const snapshot = '/profile/snapshot';
-  static const explore = '/profile/explore';
-  static const githubConnect = '/profile/github/connect';
-  static const githubAnalysis = '/profile/github/analysis';
-  static const githubReview = '/profile/github/review';
+
+  // ============== Auth ===============
+  static const String authEntry = '/auth-entry';
+  static const String login = '/login';
+  static const String createAccount = '/create-account';
+  static const String forgotPassword = '/forgot-password';
+  static const String checkInbox = '/check-inbox';
+  static const String termsOfService = '/terms-of-service';
+  static const String privacyPolicy = '/privacy-policy';
+
+  // ============== Discover & Main ===============
+  static const String main = '/main';
+  static const String discoverGuest = '/discover-guest';
+  static const String discoverSearch = '/discover-search';
+  static const String publicProfile = '/public-profile';
+  static const String projectDetails = '/project-details';
+
+  // ============== Create Project ===============
+  static const String createProject = '/create-project';
+
+  // ============== Profile ===============
+  static const String profileEdit = '/profile/edit';
+  static const String profileBasicInfo = '/profile/basic-info';
+  static const String profileTechnical = '/profile/technical';
+  static const String profileSkills = '/profile/skills';
+  static const String profileProjects = '/profile/projects';
+  static const String profileConnectWork = '/profile/connect-work';
+  static const String profileComplete = '/profile/complete';
+  static const String profileSnapshot = '/profile/snapshot';
+  static const String profileGithubConnect = '/profile/github/connect';
+  static const String profileGithubAnalysis = '/profile/github/analysis';
+  static const String profileGithubReview = '/profile/github/review';
+  static const String profileCvViewer = '/profile/cv-viewer';
 }

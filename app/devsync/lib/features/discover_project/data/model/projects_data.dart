@@ -1,0 +1,83 @@
+import 'package:flutter/material.dart';
+
+import 'package:devsync/features/discover_project/data/model/project_model.dart';
+
+// Fallback local projects data.
+const List<ProjectModel> projectsData = [
+  ProjectModel(
+    id: 'ecotrack',
+    title: 'EcoTrack Mobile',
+    icon: Icons.eco_outlined,
+    type: 'Real-world',
+    matchPercent: 92,
+    createdAgo: 'Created 2 days ago',
+    ageHours: 48,
+    status: 'Active sprint',
+    description:
+        'IoT telemetry capture and real-time carbon emissions analytics for smart building sensor networks.',
+    matchReason: 'Matches your Dart proficiency and async stream',
+    tags: ['Flutter', 'Dart', 'Riverpod', 'SQLite'],
+    tracks: ['Mobile', 'DevOps'],
+    difficulty: 'Intermediate',
+    members: 3,
+    maxMembers: 5,
+    needs: 'Mobile, UI/UX',
+  ),
+  ProjectModel(
+    id: 'openhealth',
+    title: 'OpenHealth Hub',
+    icon: Icons.shield_outlined,
+    type: 'Real-world',
+    matchPercent: 88,
+    createdAgo: 'Updated 5 hours ago',
+    ageHours: 5,
+    status: '2 roles open',
+    description:
+        'Secure, open medical record viewer and appointment scheduler for community clinics.',
+    matchReason: 'Great match for cross-platform UI and API handling',
+    tags: ['Flutter', 'Node.js', 'GraphQL', 'Firebase'],
+    tracks: ['Mobile', 'Backend'],
+    difficulty: 'Intermediate',
+    members: 4,
+    maxMembers: 6,
+    needs: 'Mobile, Backend',
+  ),
+  ProjectModel(
+    id: 'algovisualizer',
+    title: 'AlgoVisualizer Mobile',
+    icon: Icons.account_tree_outlined,
+    type: 'Learning',
+    matchPercent: 84,
+    createdAgo: 'Created yesterday',
+    ageHours: 24,
+    status: 'Mentorship available',
+    description:
+        'Interactive data structure and algorithm animation tool designed for CS students and educators.',
+    matchReason: 'Good learning project for complex UI rendering',
+    tags: ['Flutter', 'Dart', 'Testing'],
+    tracks: ['Mobile', 'Web'],
+    difficulty: 'Beginner',
+    members: 2,
+    maxMembers: 3,
+    needs: 'Mobile',
+  ),
+  ProjectModel(
+    id: 'devmetrics',
+    title: 'DevMetrics CLI & Engine',
+    icon: Icons.terminal_rounded,
+    type: 'Learning',
+    matchPercent: 86,
+    createdAgo: 'Created 4h ago',
+    ageHours: 4,
+    status: '2 tracks open',
+    description:
+        'Git analytics tool tracking commit velocity, PR review metrics, and automated release reports.',
+    matchReason: 'Great for Python tooling and backend pipelines',
+    tags: ['Python', 'Go', 'Docker'],
+    tracks: ['Backend', 'DevOps'],
+    difficulty: 'Intermediate',
+    members: 2,
+    maxMembers: 4,
+    needs: 'Backend, DevOps',
+  ),
+];

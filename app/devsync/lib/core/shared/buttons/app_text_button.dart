@@ -1,3 +1,4 @@
+import 'package:devsync/core/theme/app_colors.dart';
 import 'package:devsync/core/theme/app_styles.dart';
 import 'package:flutter/material.dart';
 
@@ -17,22 +18,19 @@ class AppTextButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: onPressed,
-      style: TextButton.styleFrom(
-        minimumSize: const Size(0, 48),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        spacing: 5,
-        children: [
-          if (leadingIcon != null) Icon(leadingIcon, color: Color(0xff0340C2)),
-          Text(buttonText, style: AppStyles.lightPrimary_16_500),
-          if (trailingIcon != null)
-            Icon(trailingIcon, color: Color(0xff0340C2)),
-        ],
+    final c = context.colors;
+    return GestureDetector(
+      onTap: onPressed,
+      child: SizedBox(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          spacing: 5,
+          children: [
+            if (leadingIcon != null) Icon(leadingIcon, color: c.primary),
+            Text(buttonText, style: AppStyles.lightPrimary_16_500(context)),
+            if (trailingIcon != null) Icon(trailingIcon, color: c.primary),
+          ],
+        ),
       ),
     );
   }

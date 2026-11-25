@@ -31,6 +31,14 @@ class AppValidators {
     return null;
   }
 
+  // 2b. Login password validation (required only).
+  static String? validateLoginPassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return AppStrings.enterPassReq;
+    }
+    return null;
+  }
+
   // 3. Name validation
   static String? validateName(String? value) {
     if (value == null || value.trim().isEmpty) {
@@ -74,7 +82,7 @@ class AppValidators {
       return AppStrings.fieldRequiredReq;
     }
     if (value.trim().length < minLength) {
-      return AppStrings.fieldLengthReq;
+      return 'Must be at least $minLength characters';
     }
     return null;
   }

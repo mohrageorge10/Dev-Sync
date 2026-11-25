@@ -1,6 +1,9 @@
+import 'package:devsync/core/animations/app_animations.dart';
 import 'package:devsync/core/theme/app_colors.dart';
+import 'package:devsync/core/theme/app_styles.dart';
 import 'package:flutter/material.dart';
 
+// Selectable skill chip.
 class AppSkillChip extends StatelessWidget {
   const AppSkillChip({
     super.key,
@@ -19,7 +22,9 @@ class AppSkillChip extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: AppAnimations.fast,
+        curve: AppAnimations.easeOut,
         height: 32,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
@@ -36,11 +41,9 @@ class AppSkillChip extends StatelessWidget {
             ],
             Text(
               label,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                color: selected ? c.primary : c.textPrimary,
-              ),
+              style: selected
+                  ? AppStyles.label14SemiBold(context, color: c.primary)
+                  : AppStyles.body13Primary(context),
             ),
           ],
         ),
