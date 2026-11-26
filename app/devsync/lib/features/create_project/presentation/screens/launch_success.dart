@@ -1,3 +1,4 @@
+import 'package:devsync/core/di/service_locator.dart';
 import 'package:devsync/core/shared/buttons/app_primary_button.dart';
 import 'package:devsync/core/shared/buttons/app_secondary_button.dart';
 import 'package:devsync/core/theme/app_colors.dart';
@@ -9,6 +10,9 @@ import 'package:devsync/features/create_project/presentation/cubit/publish/publi
 import 'package:devsync/features/create_project/presentation/cubit/publish/publish_state.dart';
 import 'package:devsync/features/create_project/presentation/cubit/team/team_cubit.dart';
 import 'package:devsync/features/create_project/presentation/widgets/soft_card.dart';
+import 'package:devsync/features/discover_project/presentation/cubit/discover/discover_cubit.dart';
+import 'package:devsync/features/my_projects/presentation/cubit/my_projects_cubit.dart';
+import 'package:devsync/features/my_teams/data/app_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -20,6 +24,15 @@ class LaunchSuccessScreen extends StatelessWidget {
   final bool embedded;
 
   void _finish(BuildContext context) {
+    if (ServiceLocator.isRegistered<DiscoverCubit>()) {
+      ServiceLocator.get<DiscoverCubit>().loadData();
+    }
+    if (ServiceLocator.isRegistered<MyProjectsCubit>()) {
+      ServiceLocator.get<MyProjectsCubit>().loadData();
+    }
+    if (ServiceLocator.isRegistered<TeamsController>()) {
+      ServiceLocator.get<TeamsController>().loadData(force: true);
+    }
     if (onDone != null) return onDone!();
     final reset = projectFlowResetter(context);
     Navigator.of(context).maybePop();

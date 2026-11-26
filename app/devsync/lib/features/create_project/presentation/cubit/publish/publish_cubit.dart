@@ -1,11 +1,15 @@
+import 'package:devsync/core/di/service_locator.dart';
 import 'package:devsync/core/networking/errors/firebase_error_handler.dart';
 import 'package:devsync/features/create_project/data/repositories/project_repository.dart';
 import 'package:devsync/features/create_project/presentation/cubit/draft/draft_cubit.dart';
 import 'package:devsync/features/create_project/presentation/cubit/publish/publish_state.dart';
 import 'package:devsync/features/create_project/presentation/cubit/team/team_cubit.dart';
+import 'package:devsync/features/discover_project/presentation/cubit/discover/discover_cubit.dart';
+import 'package:devsync/features/my_projects/presentation/cubit/my_projects_cubit.dart';
+import 'package:devsync/features/my_teams/data/app_state.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-// Handles saving draft and publishing project.
+// Handles saving draft, publishing project, and syncing dependent app controllers.
 class PublishCubit extends Cubit<PublishState> {
   PublishCubit({
     required ProjectRepository repository,
@@ -21,7 +25,7 @@ class PublishCubit extends Cubit<PublishState> {
   final TeamCubit _teamCubit;
   String? _draftProjectId;
 
-  // Save draft without publishing.
+  // Save draft without publishing and refresh My Projects.
   Future<String?> saveDraft() async {
     try {
       _draftProjectId = await _repository.saveDraft(
@@ -29,13 +33,16 @@ class PublishCubit extends Cubit<PublishState> {
         _teamCubit.state.tracks,
         existingProjectId: _draftProjectId,
       );
+      if (ServiceLocator.isRegistered<MyProjectsCubit>()) {
+        ServiceLocator.get<MyProjectsCubit>().loadData();
+      }
       return null;
     } catch (e) {
       return FirebaseErrorHandler.handle(e);
     }
   }
 
-  // Publish project to Firestore.
+  // Publish project to Firestore and refresh My Projects, My Teams, and Discover.
   Future<void> publish() async {
     emit(const PublishLoading());
     try {
@@ -46,6 +53,15 @@ class PublishCubit extends Cubit<PublishState> {
       );
       if (isClosed) return;
       _draftProjectId = null;
+      if (ServiceLocator.isRegistered<MyProjectsCubit>()) {
+        ServiceLocator.get<MyProjectsCubit>().loadData();
+      }
+      if (ServiceLocator.isRegistered<TeamsController>()) {
+        ServiceLocator.get<TeamsController>().loadData(force: true);
+      }
+      if (ServiceLocator.isRegistered<DiscoverCubit>()) {
+        ServiceLocator.get<DiscoverCubit>().loadData();
+      }
       emit(PublishSuccess(result));
     } catch (e) {
       if (isClosed) return;

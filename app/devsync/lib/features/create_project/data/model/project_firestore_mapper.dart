@@ -83,6 +83,12 @@ class ProjectFirestoreMapper {
       FirebaseConstants.fieldOpenTrackKeys: openKeys,
       FirebaseConstants.fieldTracks: trackMap,
       FirebaseConstants.fieldDraftInvites: _draftInvites(tracks, status),
+      'repoUrl': draft.repoUrl.trim(),
+      'cloneUrl': draft.effectiveCloneUrl,
+      'defaultBranch': draft.defaultBranch.trim().isEmpty
+          ? 'develop'
+          : draft.defaultBranch.trim(),
+      'gitRules': draft.gitRulesMap,
     };
   }
 
@@ -91,13 +97,18 @@ class ProjectFirestoreMapper {
     required String projectId,
     required ProjectDraft draft,
     required String ownerId,
-  }) =>
-      {
-        FirebaseConstants.fieldProjectId: projectId,
-        FirebaseConstants.fieldProjectTitle: draft.title.trim(),
-        FirebaseConstants.fieldOwnerId: ownerId,
-        FirebaseConstants.fieldMemberIds: <String>[ownerId],
-      };
+  }) => {
+    FirebaseConstants.fieldProjectId: projectId,
+    FirebaseConstants.fieldProjectTitle: draft.title.trim(),
+    FirebaseConstants.fieldOwnerId: ownerId,
+    FirebaseConstants.fieldMemberIds: <String>[ownerId],
+    FirebaseConstants.fieldExpectedEndDate:
+        draft.expectedEndDate?.toIso8601String(),
+    'repoUrl': draft.repoUrl.trim(),
+    'defaultBranch': draft.defaultBranch.trim().isEmpty
+        ? 'develop'
+        : draft.defaultBranch.trim(),
+  };
 
   // Build teams/{projectId}/members/{ownerId} document.
   static Map<String, dynamic> ownerMemberData({

@@ -1,6 +1,8 @@
 import 'package:devsync/core/theme/app_colors.dart';
+import 'package:devsync/core/theme/app_styles.dart';
 import 'package:flutter/material.dart';
 
+// Pill badge for purpose and status indicators.
 class AppBadge extends StatelessWidget {
   const AppBadge({
     super.key,
@@ -13,23 +15,13 @@ class AppBadge extends StatelessWidget {
   });
 
   final String label;
-
-  /// Text, dot and border color.
   final Color color;
-
   final Color backgroundColor;
-
-  /// Small dot before the text (used in purpose badges).
   final bool showDot;
-
   final bool showBorder;
-
-  /// Optional icon before the text (e.g. the bolt in "89% Match").
   final IconData? icon;
 
-  // ───────────── Ready-made badges (so you don't pick colors by hand) ─────────────
-
-  /// Purpose: LEARNING (blue, dot, border).
+  // Learning purpose badge.
   factory AppBadge.learning(BuildContext context) {
     final c = context.colors;
     return AppBadge(
@@ -41,7 +33,7 @@ class AppBadge extends StatelessWidget {
     );
   }
 
-  /// Purpose: REAL-WORLD (green, dot, border).
+  // Real-world purpose badge.
   factory AppBadge.realWorld(BuildContext context) {
     final c = context.colors;
     return AppBadge(
@@ -53,28 +45,28 @@ class AppBadge extends StatelessWidget {
     );
   }
 
-  /// Status: Open / Accepted (green).
+  // Success status badge.
   factory AppBadge.success(BuildContext context, String label) {
     final c = context.colors;
     return AppBadge(
         label: label, color: c.success, backgroundColor: c.subtle(c.success));
   }
 
-  /// Status: Pending (yellow).
+  // Warning status badge.
   factory AppBadge.warning(BuildContext context, String label) {
     final c = context.colors;
     return AppBadge(
         label: label, color: c.warning, backgroundColor: c.subtle(c.warning));
   }
 
-  /// Status: Declined (red).
+  // Error status badge.
   factory AppBadge.error(BuildContext context, String label) {
     final c = context.colors;
     return AppBadge(
         label: label, color: c.error, backgroundColor: c.subtle(c.error));
   }
 
-  /// Status: Full (blue).
+  // Info status badge.
   factory AppBadge.info(BuildContext context, String label) {
     final c = context.colors;
     return AppBadge(
@@ -83,38 +75,47 @@ class AppBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(9999),
-        border: showBorder ? Border.all(color: color) : null,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (showDot) ...[
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 6),
-          ],
-          if (icon != null) ...[
-            Icon(icon, size: 16, color: color),
-            const SizedBox(width: 4),
-          ],
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: color,
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final labelText = Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppStyles.label14SemiBold(context, color: color),
+        );
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(9999),
+            border: showBorder ? Border.all(color: color) : null,
           ),
-        ],
-      ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showDot) ...[
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+              if (icon != null) ...[
+                Icon(icon, size: 16, color: color),
+                const SizedBox(width: 4),
+              ],
+              if (constraints.hasBoundedWidth)
+                Flexible(child: labelText)
+              else
+                labelText,
+            ],
+          ),
+        );
+      },
     );
   }
 }

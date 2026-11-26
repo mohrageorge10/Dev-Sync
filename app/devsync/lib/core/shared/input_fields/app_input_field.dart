@@ -1,4 +1,5 @@
 import 'package:devsync/core/theme/app_colors.dart';
+import 'package:devsync/core/theme/app_styles.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -22,6 +23,7 @@ class AppInputField extends StatefulWidget {
     this.maxLines = 1,
     this.inputFormatters,
     this.trailingLabelColor,
+    this.suffixIcon,
   });
 
   final TextEditingController controller;
@@ -57,6 +59,8 @@ class AppInputField extends StatefulWidget {
   /// Color of [trailingLabel] when the field has no error/focus accent
   /// (e.g. orange character counter near the limit).
   final Color? trailingLabelColor;
+
+  final Widget? suffixIcon;
 
   @override
   State<AppInputField> createState() => _AppInputFieldState();
@@ -105,12 +109,17 @@ class _AppInputFieldState extends State<AppInputField> {
                 ? c.primary
                 : null;
 
-        Widget? suffix;
-        if (hasError) {
-          suffix = Icon(Icons.error_outline_rounded, color: c.error, size: 24);
-        } else if (focused && hasText) {
-          suffix =
-              Icon(Icons.check_circle_outline_rounded, color: c.primary, size: 24);
+        Widget? suffix = widget.suffixIcon;
+        if (suffix == null) {
+          if (hasError) {
+            suffix = Icon(Icons.error_outline_rounded, color: c.error, size: 24);
+          } else if (focused && hasText) {
+            suffix = Icon(
+              Icons.check_circle_outline_rounded,
+              color: c.primary,
+              size: 24,
+            );
+          }
         }
 
         return Column(
@@ -124,22 +133,16 @@ class _AppInputFieldState extends State<AppInputField> {
                   if (widget.label != null)
                     Text(
                       widget.label!,
-                      style: TextStyle(
-                        fontSize: 14,
-                        height: 20 / 14,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.14,
+                      style: AppStyles.label14SemiBold(
+                        context,
                         color: accent ?? c.textPrimary,
                       ),
                     ),
                   if (widget.trailingLabel != null)
                     Text(
                       widget.trailingLabel!,
-                      style: TextStyle(
-                        fontSize: 12,
-                        height: 16 / 12,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 0.24,
+                      style: AppStyles.body12Medium(
+                        context,
                         color: accent ??
                             widget.trailingLabelColor ??
                             c.textSecondary,
@@ -162,24 +165,15 @@ class _AppInputFieldState extends State<AppInputField> {
               inputFormatters: widget.inputFormatters,
               onSubmitted: widget.onSubmitted,
               cursorColor: accent ?? c.primary,
-              style: TextStyle(
-                fontSize: 16,
-                height: 24 / 16,
-                color: hasError ? c.error : c.textPrimary,
-              ),
+              style: AppStyles.inputText(context, hasError: hasError),
               onChanged: (value) {
                 state.didChange(value);
                 widget.onChanged?.call(value);
               },
               decoration: InputDecoration(
                 hintText: widget.hint,
-                hintStyle: TextStyle(
-                  fontSize: 16,
-                  height: 24 / 16,
-                  color: c.textSecondary,
-                ),
+                hintStyle: AppStyles.inputHint(context),
                 filled: true,
-                // Focused / error: white background, otherwise surface.
                 fillColor:
                     (focused || hasError) ? c.backgroundPrimary : c.surface,
                 constraints: const BoxConstraints(minHeight: 48),
@@ -187,8 +181,11 @@ class _AppInputFieldState extends State<AppInputField> {
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 prefixIcon: widget.prefixIcon == null
                     ? null
-                    : Icon(widget.prefixIcon,
-                        size: 24, color: accent ?? c.textSecondary),
+                    : Icon(
+                        widget.prefixIcon,
+                        size: 24,
+                        color: accent ?? c.textSecondary,
+                      ),
                 suffixIcon: suffix,
                 border: _border(c.border, 1),
                 enabledBorder: _border(c.border, 1),
@@ -196,14 +193,9 @@ class _AppInputFieldState extends State<AppInputField> {
                 focusedBorder: _border(c.primary, 1.5),
                 errorBorder: _border(c.error, 1.5),
                 focusedErrorBorder: _border(c.error, 1.5),
-                // Error text sits 4px below the field.
                 errorText: state.errorText,
                 errorMaxLines: 2,
-                errorStyle: TextStyle(
-                  fontSize: 12,
-                  height: 16 / 12,
-                  color: c.error,
-                ),
+                errorStyle: AppStyles.body12Error(context),
               ),
             ),
           ],

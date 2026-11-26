@@ -1,4 +1,5 @@
 import 'package:devsync/core/theme/app_colors.dart';
+import 'package:devsync/core/theme/app_styles.dart';
 import 'package:flutter/material.dart';
 
 class AppTabBar extends StatelessWidget {
@@ -56,9 +57,8 @@ class AppTabBar extends StatelessWidget {
                           child: Text(
                             labels[i],
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
+                            style: AppStyles.title16SemiBold(
+                              context,
                               color: i == selectedIndex
                                   ? c.primary
                                   : c.textSecondary,
@@ -76,9 +76,8 @@ class AppTabBar extends StatelessWidget {
                             ),
                             child: Text(
                               '${badges[i]}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                              style: AppStyles.body12SemiBold(
+                                context,
                                 color: c.primary,
                               ),
                             ),

@@ -63,5 +63,34 @@ class DraftCubit extends Cubit<DraftState> {
             : _draft.copyWith(expectedEndDate: date),
       );
 
+  void setRepoUrl(String v) => _update(_draft.copyWith(repoUrl: v));
+
+  void setCloneUrl(String v) => _update(_draft.copyWith(cloneUrl: v));
+
+  void setDefaultBranch(String v) => _update(_draft.copyWith(defaultBranch: v));
+
+  void setRequireFeatureBranches(bool v) =>
+      _update(_draft.copyWith(requireFeatureBranches: v));
+
+  void setBranchPrefix(String v) => _update(_draft.copyWith(branchPrefix: v));
+
+  void setBlockDirectMainMerge(bool v) =>
+      _update(_draft.copyWith(blockDirectMainMerge: v));
+
+  void setRequirePrReview(bool v) =>
+      _update(_draft.copyWith(requirePrReview: v));
+
+  void addCustomRule(String rule) {
+    final trimmed = rule.trim();
+    if (trimmed.isEmpty) return;
+    _update(_draft.copyWith(customRules: [..._draft.customRules, trimmed]));
+  }
+
+  void removeCustomRule(int index) {
+    if (index < 0 || index >= _draft.customRules.length) return;
+    final updated = [..._draft.customRules]..removeAt(index);
+    _update(_draft.copyWith(customRules: updated));
+  }
+
   void reset() => emit(DraftState(draft: ProjectDraft(ownerTrack: _ownerTrack)));
 }

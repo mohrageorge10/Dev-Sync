@@ -160,6 +160,57 @@ class ReviewPublishScreen extends StatelessWidget {
         ),
         const SizedBox(height: 12),
 
+        // Repository & Git rules summary.
+        _Section(
+          title: 'Repository & Git Rules',
+          icon: Icons.code_rounded,
+          onEdit: () => onEditDetails?.call(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  _MetaPill(
+                    Icons.account_tree_outlined,
+                    'Base: ${draft.defaultBranch}',
+                  ),
+                  if (draft.repoUrl.trim().isNotEmpty)
+                    _MetaPill(
+                      Icons.link_rounded,
+                      draft.repoUrl.replaceFirst(RegExp(r'^https?://'), ''),
+                    ),
+                ],
+              ),
+              if (draft.activeGitRules.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                for (final rule in draft.activeGitRules)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 13,
+                          color: c.success,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            rule,
+                            style: AppStyles.body11Primary(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
         // Team structure summary.
         _Section(
           title:
