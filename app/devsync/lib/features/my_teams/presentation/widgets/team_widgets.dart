@@ -131,31 +131,29 @@ class MemberTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Flexible(
-                      child: Text(
-                        isMe ? '${member.name} (You)' : member.name,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppStyles.body13Bold(context),
-                      ),
+                    Text(
+                      isMe ? '${member.name} (You)' : member.name,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppStyles.body13Bold(context),
                     ),
-                    const SizedBox(width: 6),
                     Pill(
-                      role.shortLabel,
+                      member.roleBadgeLabel,
                       fg: roleFg,
                       bg: roleBg,
                       fontSize: 9.5,
                     ),
-                    if (member.isOwner && member.alsoTrackLeader) ...[
-                      const SizedBox(width: 4),
+                    if (member.isOwner && member.alsoTrackLeader)
                       Pill(
-                        TeamRole.trackLeader.shortLabel,
+                        member.leaderBadgeLabel,
                         fg: c.warning,
                         bg: c.subtle(c.warning),
                         fontSize: 9.5,
                       ),
-                    ],
                   ],
                 ),
                 const SizedBox(height: 2),

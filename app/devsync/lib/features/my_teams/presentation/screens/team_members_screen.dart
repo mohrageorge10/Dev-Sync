@@ -7,6 +7,7 @@ import '../../data/app_state.dart';
 import '../../data/models/models.dart';
 import '../widgets/common.dart';
 import '../widgets/team_widgets.dart';
+import '../widgets/track_leader_picker_dialog.dart';
 
 // Screen displaying active team members, role management (Owner), and open roles.
 class TeamMembersScreen extends StatelessWidget {
@@ -79,8 +80,8 @@ class TeamMembersScreen extends StatelessWidget {
               isMe: m.id == state.me.id,
               onManageTap: isOwner
                   ? () => m.isOwner
-                        ? _showOwnerSelfRoleSheet(context, state, m)
-                        : _showManageMemberSheet(context, state, m)
+                        ? _showOwnerSelfRoleSheet(context, state, team, m)
+                        : _showManageMemberSheet(context, state, team, m)
                   : null,
             ),
             const SizedBox(height: 10),
@@ -107,10 +108,11 @@ class TeamMembersScreen extends StatelessWidget {
     );
   }
 
-  // Owner self-role sheet: toggle also acting as Track Leader while remaining Owner.
+  // Owner self-role sheet: assign or remove Owner's project-track leader badge.
   Future<void> _showOwnerSelfRoleSheet(
     BuildContext context,
     TeamsController state,
+    Team team,
     Member owner,
   ) async {
     final c = context.colors;
@@ -139,7 +141,7 @@ class TeamMembersScreen extends StatelessWidget {
                         Text('${owner.name} (You)', style: AppStyles.body14Bold(ctx)),
                         Text(
                           alsoLeader
-                              ? 'Project Owner & Track Leader'
+                              ? 'Project Owner & ${owner.leaderBadgeLabel}'
                               : 'Project Owner',
                           style: AppStyles.body11Secondary(ctx),
                         ),
@@ -153,27 +155,49 @@ class TeamMembersScreen extends StatelessWidget {
             ListTile(
               leading: Icon(Icons.workspace_premium_outlined, color: c.warning),
               title: Text(
-                alsoLeader
-                    ? 'Remove Track Leader Badge'
-                    : 'Also Act as Track Leader',
+                alsoLeader ? 'Change Leader Track' : 'Also Act as Track Leader',
                 style: AppStyles.body14Primary(ctx),
               ),
               subtitle: Text(
-                'You stay Project Owner with full permissions.',
+                'Pick one of this project\'s tracks to lead while staying Owner.',
                 style: AppStyles.body11Secondary(ctx),
               ),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(ctx);
-                state.toggleOwnerTrackLeader(teamId);
+                final picked = await showTrackLeaderPickerDialog(
+                  context,
+                  memberName: 'you',
+                  projectTracks: team.availableTracks,
+                  currentTrack: owner.leaderTrack,
+                );
+                if (picked == null || !context.mounted) return;
+                await state.toggleOwnerTrackLeader(teamId, leaderTrack: picked);
+                if (!context.mounted) return;
+                final label = picked.isEmpty ? 'Track Leader' : '$picked Leader';
                 showSnack(
                   context,
-                  alsoLeader
-                      ? 'Removed Track Leader badge'
-                      : 'You are now Project Owner & Track Leader',
+                  'You are now Project Owner & $label',
                   type: AppFeedbackType.success,
                 );
               },
             ),
+            if (alsoLeader)
+              ListTile(
+                leading: Icon(Icons.remove_circle_outline, color: c.textSecondary),
+                title: Text(
+                  'Remove ${owner.leaderBadgeLabel} Badge',
+                  style: AppStyles.body14Primary(ctx),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  state.toggleOwnerTrackLeader(teamId);
+                  showSnack(
+                    context,
+                    'Removed ${owner.leaderBadgeLabel} badge',
+                    type: AppFeedbackType.success,
+                  );
+                },
+              ),
             const SizedBox(height: 8),
           ],
         ),
@@ -181,10 +205,11 @@ class TeamMembersScreen extends StatelessWidget {
     );
   }
 
-  // Owner bottom sheet to switch a member between Track Leader & Member or remove them.
+  // Owner bottom sheet to assign a project track leader role, demote, or remove a member.
   Future<void> _showManageMemberSheet(
     BuildContext context,
     TeamsController state,
+    Team team,
     Member member,
   ) async {
     final c = context.colors;
@@ -212,7 +237,7 @@ class TeamMembersScreen extends StatelessWidget {
                       children: [
                         Text(member.name, style: AppStyles.body14Bold(ctx)),
                         Text(
-                          member.effectiveRole.label,
+                          member.roleBadgeLabel,
                           style: AppStyles.body11Secondary(ctx),
                         ),
                       ],
@@ -223,26 +248,56 @@ class TeamMembersScreen extends StatelessWidget {
             ),
             Divider(color: c.border),
             ListTile(
-              leading: Icon(
-                isLeader ? Icons.person_outline : Icons.workspace_premium_outlined,
-                color: c.primary,
-              ),
+              leading: Icon(Icons.workspace_premium_outlined, color: c.primary),
               title: Text(
-                isLeader ? 'Set as Member' : 'Promote to Track Leader',
+                isLeader ? 'Change Leader Track' : 'Promote to Track Leader',
                 style: AppStyles.body14Primary(ctx),
               ),
-              onTap: () {
+              subtitle: Text(
+                'Assign a specific track from this project (e.g. Flutter, Backend).',
+                style: AppStyles.body11Secondary(ctx),
+              ),
+              onTap: () async {
                 Navigator.pop(ctx);
-                final nextRole =
-                    isLeader ? TeamRole.member : TeamRole.trackLeader;
-                state.setMemberRole(teamId, member.id, nextRole);
+                final picked = await showTrackLeaderPickerDialog(
+                  context,
+                  memberName: member.name,
+                  projectTracks: team.availableTracks,
+                  currentTrack: member.leaderTrack,
+                );
+                if (picked == null || !context.mounted) return;
+                await state.setMemberRole(
+                  teamId,
+                  member.id,
+                  TeamRole.trackLeader,
+                  leaderTrack: picked,
+                );
+                if (!context.mounted) return;
+                final label = picked.isEmpty ? 'Track Leader' : '$picked Leader';
                 showSnack(
                   context,
-                  '${member.name} is now ${nextRole.label}',
+                  '${member.name} is now $label',
                   type: AppFeedbackType.success,
                 );
               },
             ),
+            if (isLeader)
+              ListTile(
+                leading: Icon(Icons.person_outline, color: c.textSecondary),
+                title: Text(
+                  'Set as Member',
+                  style: AppStyles.body14Primary(ctx),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  state.setMemberRole(teamId, member.id, TeamRole.member);
+                  showSnack(
+                    context,
+                    '${member.name} is now Member',
+                    type: AppFeedbackType.success,
+                  );
+                },
+              ),
             ListTile(
               leading: Icon(Icons.person_remove_outlined, color: c.error),
               title: Text(

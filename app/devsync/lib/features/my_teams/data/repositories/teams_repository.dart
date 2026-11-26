@@ -117,6 +117,14 @@ class TeamsRepository {
           rawSettings is Map ? Map<String, dynamic>.from(rawSettings) : null,
         );
 
+        final rawTracks =
+            doc[FirebaseConstants.fieldTrackKeys] ??
+            doc[FirebaseConstants.fieldOpenTrackKeys];
+        final projectTracks = <String>[
+          if (rawTracks is Iterable)
+            for (final t in rawTracks) t.toString(),
+        ];
+
         teams.add(
           Team(
             id: teamId,
@@ -139,6 +147,7 @@ class TeamsRepository {
             ownerId: ownerId,
             expectedEndDate: endDate,
             settings: settings,
+            projectTracks: projectTracks,
           ),
         );
       }
@@ -149,7 +158,7 @@ class TeamsRepository {
     }
   }
 
-  // Persist workspace metadata & role permissions to teams/{teamId}.
+  // Persist workspace metadata & role permissions to teams/{teamId} and mirror to projects/{teamId}.
   Future<void> updateTeamSettings(Team team) async {
     try {
       await _firestore.setDocument(
@@ -166,15 +175,34 @@ class TeamsRepository {
         },
         merge: true,
       );
+      final cleanRepo = team.repoUrl.trim().replaceAll(RegExp(r'/+$'), '');
+      await _firestore.setDocument(
+        collectionPath: FirebaseConstants.projectsCollection,
+        docId: team.id,
+        data: {
+          'repoUrl': team.repoUrl,
+          if (cleanRepo.isNotEmpty)
+            'cloneUrl': cleanRepo.endsWith('.git')
+                ? cleanRepo
+                : '$cleanRepo.git',
+          if (team.expectedEndDate != null)
+            FirebaseConstants.fieldExpectedEndDate:
+                team.expectedEndDate!.toIso8601String(),
+          FirebaseConstants.fieldUpdatedAt: _firestore.serverTimestamp,
+        },
+        merge: true,
+      );
     } catch (_) {}
   }
 
-  // Update a team member's role in teams/{teamId}/members/{memberId}.
+  // Update a team member's role and optional leader track in teams/{teamId}/members/{memberId}.
   Future<void> updateMemberRole({
     required String teamId,
     required String memberId,
     required TeamRole role,
     bool? alsoTrackLeader,
+    String? leaderTrack,
+    bool clearLeaderTrack = false,
   }) async {
     try {
       await _firestore.setDocument(
@@ -185,13 +213,17 @@ class TeamsRepository {
           'teamRole': role.name,
           FirebaseConstants.fieldIsOwner: role == TeamRole.owner,
           if (alsoTrackLeader != null) 'alsoTrackLeader': alsoTrackLeader,
+          if (clearLeaderTrack)
+            'leaderTrack': null
+          else if (leaderTrack != null)
+            'leaderTrack': leaderTrack,
         },
         merge: true,
       );
     } catch (_) {}
   }
 
-  // Remove a member from teams/{teamId}.
+  // Remove a member from teams/{teamId} and decrement projects/{teamId}.filledCount.
   Future<void> removeMember({
     required String teamId,
     required String memberId,
@@ -209,6 +241,15 @@ class TeamsRepository {
           FirebaseConstants.fieldMemberIds: FieldValue.arrayRemove([memberId]),
           FirebaseConstants.fieldUpdatedAt: _firestore.serverTimestamp,
         },
+      );
+      await _firestore.setDocument(
+        collectionPath: FirebaseConstants.projectsCollection,
+        docId: teamId,
+        data: {
+          FirebaseConstants.fieldFilledCount: FieldValue.increment(-1),
+          FirebaseConstants.fieldUpdatedAt: _firestore.serverTimestamp,
+        },
+        merge: true,
       );
     } catch (_) {}
   }

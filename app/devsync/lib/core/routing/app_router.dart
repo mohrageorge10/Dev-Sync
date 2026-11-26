@@ -20,6 +20,8 @@ import 'package:devsync/features/discover_project/presentation/screens/main_scre
 import 'package:devsync/features/discover_project/presentation/screens/project_details_screen.dart';
 import 'package:devsync/features/discover_project/presentation/screens/public_profile_screen.dart';
 import 'package:devsync/features/discover_project/presentation/screens/search_screen.dart';
+import 'package:devsync/features/my_projects/presentation/cubit/my_projects_cubit.dart';
+import 'package:devsync/features/my_projects/presentation/screens/my_projects_screen.dart';
 import 'package:devsync/features/my_teams/data/app_state.dart';
 import 'package:devsync/features/my_teams/data/models/models.dart';
 import 'package:devsync/features/my_teams/presentation/screens/my_teams_screen.dart';
@@ -43,6 +45,7 @@ import 'package:devsync/features/profile/presentation/screens/project_interests_
 import 'package:devsync/features/profile/presentation/screens/skills_expertise_screen.dart';
 import 'package:devsync/features/profile/presentation/screens/technical_profile_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class AppRouter {
   Route generateRoute(RouteSettings settings) {
@@ -163,6 +166,15 @@ class AppRouter {
         return AppPageRoute(
           builder: (_) =>
               const CreateProjectProviders(child: CreateProjectScreen()),
+          settings: settings,
+        );
+
+      case AppRoutes.myProjects:
+        return AppPageRoute(
+          builder: (_) => BlocProvider.value(
+            value: ServiceLocator.get<MyProjectsCubit>()..loadData(),
+            child: const MyProjectsScreen(),
+          ),
           settings: settings,
         );
 

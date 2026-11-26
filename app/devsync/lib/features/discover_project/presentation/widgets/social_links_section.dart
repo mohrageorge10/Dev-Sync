@@ -1,4 +1,3 @@
-import 'package:devsync/core/shared/badges/app_badge.dart';
 import 'package:devsync/core/shared/feedback/app_feedback.dart';
 import 'package:devsync/core/theme/app_colors.dart';
 import 'package:devsync/core/theme/app_styles.dart';
@@ -75,7 +74,37 @@ class SocialLinksSection extends StatelessWidget {
                                   style: AppStyles.body14Bold(context),
                                 ),
                                 if (item.isConnected)
-                                  AppBadge.success(context, 'CONNECTED'),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: c.subtle(c.success),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 5,
+                                          height: 5,
+                                          decoration: BoxDecoration(
+                                            color: c.success,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Connected',
+                                          style: AppStyles.body11Bold(
+                                            context,
+                                            color: c.success,
+                                          ).copyWith(fontSize: 10),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                               ],
                             ),
                             const SizedBox(height: 3),

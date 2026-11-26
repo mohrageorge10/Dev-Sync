@@ -10,6 +10,8 @@ import 'package:devsync/features/create_project/data/repositories/builders_repos
 import 'package:devsync/features/create_project/data/repositories/project_repository.dart';
 import 'package:devsync/features/discover_project/data/repositories/discover_repository.dart';
 import 'package:devsync/features/discover_project/presentation/cubit/discover/discover_cubit.dart';
+import 'package:devsync/features/my_projects/data/repo/my_projects_repo.dart';
+import 'package:devsync/features/my_projects/presentation/cubit/my_projects_cubit.dart';
 import 'package:devsync/features/my_teams/data/app_state.dart';
 import 'package:devsync/features/my_teams/data/repositories/teams_repository.dart';
 import 'package:devsync/features/profile/data/repositories/profile_repository.dart';
@@ -97,5 +99,16 @@ void setupLocator() {
   );
   ServiceLocator.registerLazySingleton<TeamsController>(
     () => TeamsController(repository: ServiceLocator.get<TeamsRepository>()),
+  );
+
+  // My Projects Repository & Shared Cubit
+  ServiceLocator.registerLazySingleton<MyProjectsRepo>(
+    () => MyProjectsRepo(
+      firestoreService: ServiceLocator.get<FirestoreService>(),
+      authService: ServiceLocator.get<FirebaseAuthService>(),
+    ),
+  );
+  ServiceLocator.registerLazySingleton<MyProjectsCubit>(
+    () => MyProjectsCubit(ServiceLocator.get<MyProjectsRepo>()),
   );
 }

@@ -22,6 +22,9 @@ class AppRoutes {
   // ============== Create Project ===============
   static const String createProject = '/create-project';
 
+  // ============== My Projects ===============
+  static const String myProjects = '/my-projects';
+
   // ============== Profile ===============
   static const String profileEdit = '/profile/edit';
   static const String profileBasicInfo = '/profile/basic-info';

@@ -12,6 +12,7 @@ import 'package:devsync/features/discover_project/presentation/widgets/available
 import 'package:devsync/features/discover_project/presentation/widgets/invite_project_picker_sheet.dart';
 import 'package:devsync/features/discover_project/presentation/widgets/portfolio_project_card.dart';
 import 'package:devsync/features/discover_project/presentation/widgets/profile_summary_card.dart';
+import 'package:devsync/features/discover_project/presentation/widgets/public_cv_card.dart';
 import 'package:devsync/features/discover_project/presentation/widgets/skills_section_card.dart';
 import 'package:devsync/features/discover_project/presentation/widgets/social_links_section.dart';
 import 'package:flutter/material.dart';
@@ -22,17 +23,26 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 class PublicProfileScreen extends StatelessWidget {
   final DeveloperModel developer;
   final bool isGuest;
+  final bool showBottomBar;
+  final Widget? customBottomBar;
 
   const PublicProfileScreen({
     super.key,
     required this.developer,
     this.isGuest = false,
+    this.showBottomBar = true,
+    this.customBottomBar,
   });
 
   @override
   Widget build(BuildContext context) {
     return DiscoverCubitScope(
-      child: _ProfileView(developer: developer, isGuest: isGuest),
+      child: _ProfileView(
+        developer: developer,
+        isGuest: isGuest,
+        showBottomBar: showBottomBar,
+        customBottomBar: customBottomBar,
+      ),
     );
   }
 }
@@ -40,8 +50,15 @@ class PublicProfileScreen extends StatelessWidget {
 class _ProfileView extends StatelessWidget {
   final DeveloperModel developer;
   final bool isGuest;
+  final bool showBottomBar;
+  final Widget? customBottomBar;
 
-  const _ProfileView({required this.developer, required this.isGuest});
+  const _ProfileView({
+    required this.developer,
+    required this.isGuest,
+    required this.showBottomBar,
+    required this.customBottomBar,
+  });
 
   void _onMessage(BuildContext context) {
     if (isGuest) {
@@ -155,6 +172,11 @@ class _ProfileView extends StatelessWidget {
                 text: '$totalValidated Validated',
               ),
               SkillsSectionCard(initialSkillsCategories: skillCategories),
+              Header(
+                title: 'Resume / CV',
+                text: developer.hasCv ? 'PDF Attached' : 'Not uploaded',
+              ),
+              PublicCvCard(developer: developer),
               const Header(
                 title: 'Connected Accounts',
                 text: 'Verified links',
@@ -182,24 +204,28 @@ class _ProfileView extends StatelessWidget {
           ),
         ),
       ),
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: c.backgroundPrimary,
-            border: Border(top: BorderSide(color: c.border)),
-          ),
-          child: BlocBuilder<DiscoverCubit, DiscoverState>(
-            buildWhen: (a, b) =>
-                a.invitedDeveloperIds != b.invitedDeveloperIds,
-            builder: (context, state) => ActionButtonsWidget(
-              isInvited: state.isDeveloperInvited(developer.id),
-              onMessagePressed: () => _onMessage(context),
-              onInvitePressed: () => _onInvite(context),
+      bottomNavigationBar: !showBottomBar
+          ? null
+          : SafeArea(
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: c.backgroundPrimary,
+                  border: Border(top: BorderSide(color: c.border)),
+                ),
+                child:
+                    customBottomBar ??
+                    BlocBuilder<DiscoverCubit, DiscoverState>(
+                      buildWhen: (a, b) =>
+                          a.invitedDeveloperIds != b.invitedDeveloperIds,
+                      builder: (context, state) => ActionButtonsWidget(
+                        isInvited: state.isDeveloperInvited(developer.id),
+                        onMessagePressed: () => _onMessage(context),
+                        onInvitePressed: () => _onInvite(context),
+                      ),
+                    ),
+              ),
             ),
-          ),
-        ),
-      ),
     );
   }
 }

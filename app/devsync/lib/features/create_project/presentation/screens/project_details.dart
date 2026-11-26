@@ -9,6 +9,7 @@ import 'package:devsync/features/create_project/data/model/enums.dart';
 import 'package:devsync/features/create_project/data/model/project_draft.dart';
 import 'package:devsync/features/create_project/presentation/cubit/draft/draft_cubit.dart';
 import 'package:devsync/features/create_project/presentation/widgets/project_strength_meter.dart';
+import 'package:devsync/features/create_project/presentation/widgets/repo_rules_section.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -39,11 +40,9 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> {
     super.dispose();
   }
 
-  // Open themed calendar date picker.
+  // Open unified global calendar date picker.
   Future<void> _pickEndDate(BuildContext context, DateTime? current) async {
     final notifier = context.read<DraftCubit>();
-    final c = context.colors;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final now = DateTime.now();
 
     final picked = await showDatePicker(
@@ -55,48 +54,7 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> {
       lastDate: now.add(const Duration(days: 365 * 3)),
       helpText: 'EXPECTED END DATE',
       cancelText: 'Cancel',
-      confirmText: 'Confirm Date',
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: (isDark
-                  ? ColorScheme.dark(
-                      primary: c.primary,
-                      onPrimary: c.onPrimary,
-                      surface: c.backgroundPrimary,
-                      onSurface: c.textPrimary,
-                    )
-                  : ColorScheme.light(
-                      primary: c.primary,
-                      onPrimary: c.onPrimary,
-                      surface: c.backgroundPrimary,
-                      onSurface: c.textPrimary,
-                    ))
-              .copyWith(surfaceTint: Colors.transparent),
-          datePickerTheme: DatePickerThemeData(
-            backgroundColor: c.backgroundPrimary,
-            surfaceTintColor: Colors.transparent,
-            headerBackgroundColor: c.subtleBlueSurface,
-            headerForegroundColor: c.primary,
-            dividerColor: c.border,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-              side: BorderSide(color: c.border),
-            ),
-            dayShape: WidgetStatePropertyAll(
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            todayBorder: BorderSide(color: c.primary, width: 1.5),
-            confirmButtonStyle: TextButton.styleFrom(
-              foregroundColor: c.onPrimary,
-              backgroundColor: c.primary,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-        ),
-        child: child!,
-      ),
+      confirmText: 'Confirm',
     );
     if (picked != null) notifier.setExpectedEndDate(picked);
   }
@@ -256,7 +214,11 @@ class _ProjectDetailsScreenState extends State<ProjectDetailsScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 16),
+
+        // Repository, clone link, and Git contribution rules.
+        const RepoRulesSection(),
+        const SizedBox(height: 24),
 
         // Continue button.
         AppPrimaryButton(

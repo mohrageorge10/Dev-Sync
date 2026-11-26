@@ -1,3 +1,5 @@
+import 'package:devsync/core/di/service_locator.dart';
+import 'package:devsync/features/my_projects/presentation/cubit/my_projects_cubit.dart';
 import 'package:devsync/features/my_teams/data/models/models.dart';
 import 'package:devsync/features/my_teams/data/repositories/teams_repository.dart';
 import 'package:flutter/material.dart';
@@ -145,6 +147,59 @@ class TeamsController extends ChangeNotifier {
     }
   }
 
+  // Sync a newly accepted member from My Projects into the matching team.
+  void syncMemberAdded({
+    required String teamId,
+    required Member member,
+    String? teamName,
+  }) {
+    var idx = _teams.indexWhere((t) => t.id == teamId);
+    if (idx == -1 && teamName != null && teamName.trim().isNotEmpty) {
+      final needle = teamName.trim().toLowerCase();
+      idx = _teams.indexWhere((t) => t.name.trim().toLowerCase() == needle);
+    }
+    if (idx == -1) return;
+    final team = _teams[idx];
+    if (team.members.any((m) => m.id == member.id)) return;
+    final nextMembers = [...team.members, member];
+    final nextSeats = nextMembers.length > team.totalSeats
+        ? nextMembers.length
+        : team.totalSeats;
+    final remainingRoles = List<OpenRole>.from(team.openRoles);
+    final roleIdx = remainingRoles.indexWhere(
+      (r) => r.title.trim().toLowerCase() == member.role.trim().toLowerCase(),
+    );
+    if (roleIdx != -1) remainingRoles.removeAt(roleIdx);
+    _teams[idx] = team.copyWith(
+      members: nextMembers,
+      totalSeats: nextSeats,
+      openRoles: remainingRoles,
+    );
+    notifyListeners();
+  }
+
+  // Sync updated project metadata (title, seats, repoUrl) from My Projects.
+  void syncProjectMetadata({
+    required String teamId,
+    String? previousName,
+    String? name,
+    int? totalSeats,
+    String? repoUrl,
+  }) {
+    var idx = _teams.indexWhere((t) => t.id == teamId);
+    if (idx == -1 && previousName != null && previousName.trim().isNotEmpty) {
+      final needle = previousName.trim().toLowerCase();
+      idx = _teams.indexWhere((t) => t.name.trim().toLowerCase() == needle);
+    }
+    if (idx == -1) return;
+    _teams[idx] = _teams[idx].copyWith(
+      name: name,
+      totalSeats: totalSeats,
+      repoUrl: repoUrl,
+    );
+    notifyListeners();
+  }
+
   // Update workspace details & role permissions (Owner-only).
   Future<void> updateTeamSettings(
     String teamId, {
@@ -166,22 +221,36 @@ class TeamsController extends ChangeNotifier {
     );
     _teams[idx] = updated;
     notifyListeners();
+    if (repoUrl != null && ServiceLocator.isRegistered<MyProjectsCubit>()) {
+      ServiceLocator.get<MyProjectsCubit>().syncFromTeam(
+        projectId: teamId,
+        repoUrl: updated.repoUrl,
+      );
+    }
     await _repository?.updateTeamSettings(updated);
   }
 
-  // Toggle whether the Project Owner also acts as a Track Leader (while staying Owner).
-  Future<void> toggleOwnerTrackLeader(String teamId) async {
+  // Toggle whether the Project Owner also acts as a Track Leader for a specific project track.
+  Future<void> toggleOwnerTrackLeader(
+    String teamId, {
+    String? leaderTrack,
+  }) async {
     if (!isOwnerOf(teamId)) return;
     final idx = _teams.indexWhere((t) => t.id == teamId);
     if (idx == -1) return;
     final team = _teams[idx];
     var nextValue = false;
+    final cleanTrack = leaderTrack?.trim();
     final updatedMembers = [
       for (final m in team.members)
         if (m.id == me.id && m.isOwner)
           () {
-            nextValue = !m.alsoTrackLeader;
-            return m.copyWith(alsoTrackLeader: nextValue);
+            nextValue = leaderTrack != null ? true : !m.alsoTrackLeader;
+            return m.copyWith(
+              alsoTrackLeader: nextValue,
+              leaderTrack: nextValue ? cleanTrack : null,
+              clearLeaderTrack: !nextValue,
+            );
           }()
         else
           m,
@@ -193,22 +262,34 @@ class TeamsController extends ChangeNotifier {
       memberId: me.id,
       role: TeamRole.owner,
       alsoTrackLeader: nextValue,
+      leaderTrack: nextValue ? cleanTrack : null,
+      clearLeaderTrack: !nextValue,
     );
   }
 
-  // Change a member's team role between Track Leader and Member (Owner-only).
+  // Change a member's team role between Track Leader (with optional project track) and Member.
   Future<void> setMemberRole(
     String teamId,
     String memberId,
-    TeamRole role,
-  ) async {
+    TeamRole role, {
+    String? leaderTrack,
+  }) async {
     if (!isOwnerOf(teamId) || role == TeamRole.owner) return;
     final idx = _teams.indexWhere((t) => t.id == teamId);
     if (idx == -1) return;
     final team = _teams[idx];
+    final cleanTrack = role == TeamRole.trackLeader ? leaderTrack?.trim() : null;
+    final clearTrack = role == TeamRole.member;
     final updatedMembers = [
       for (final m in team.members)
-        if (m.id == memberId && !m.isOwner) m.copyWith(teamRole: role) else m,
+        if (m.id == memberId && !m.isOwner)
+          m.copyWith(
+            teamRole: role,
+            leaderTrack: cleanTrack,
+            clearLeaderTrack: clearTrack,
+          )
+        else
+          m,
     ];
     _teams[idx] = team.copyWith(members: updatedMembers);
     notifyListeners();
@@ -216,6 +297,8 @@ class TeamsController extends ChangeNotifier {
       teamId: teamId,
       memberId: memberId,
       role: role,
+      leaderTrack: cleanTrack,
+      clearLeaderTrack: clearTrack,
     );
   }
 
@@ -236,6 +319,12 @@ class TeamsController extends ChangeNotifier {
       t.assignee = null;
     }
     notifyListeners();
+    if (ServiceLocator.isRegistered<MyProjectsCubit>()) {
+      ServiceLocator.get<MyProjectsCubit>().syncFromTeam(
+        projectId: teamId,
+        membersCountDelta: -1,
+      );
+    }
     await _repository?.removeMember(teamId: teamId, memberId: memberId);
   }
 
@@ -370,6 +459,7 @@ class TeamsController extends ChangeNotifier {
       handle: '@sarahlin_dev',
       role: 'UI/UX & Design Systems',
       teamRole: TeamRole.trackLeader,
+      leaderTrack: 'UI/UX',
     );
     const marcus = Member(
       id: 'u3',
@@ -404,6 +494,7 @@ class TeamsController extends ChangeNotifier {
           repoUrl: 'https://github.com/ecotrack/mobile',
           ownerId: me.id,
           expectedEndDate: now.add(const Duration(days: 8)),
+          projectTracks: const ['Flutter', 'Backend', 'UI/UX', 'QA'],
           openRoles: const [
             OpenRole(
               title: 'Backend / SQLite Architect',

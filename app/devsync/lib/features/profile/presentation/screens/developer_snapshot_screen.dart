@@ -3,6 +3,7 @@ import 'package:devsync/core/routing/app_routes.dart';
 import 'package:devsync/core/theme/app_colors.dart';
 import 'package:devsync/core/theme/app_styles.dart';
 import 'package:devsync/features/discover_project/presentation/cubit/discover/discover_cubit.dart';
+import 'package:devsync/features/my_projects/presentation/cubit/my_projects_cubit.dart';
 import 'package:devsync/features/my_teams/data/app_state.dart';
 import 'package:devsync/features/profile/presentation/cubit/profile_controller.dart';
 import 'package:devsync/features/profile/presentation/widgets/profile_buttons.dart';
@@ -155,6 +156,9 @@ class DeveloperSnapshotScreen extends StatelessWidget {
     }
     if (ServiceLocator.isRegistered<TeamsController>()) {
       ServiceLocator.get<TeamsController>().reset();
+    }
+    if (ServiceLocator.isRegistered<MyProjectsCubit>()) {
+      ServiceLocator.get<MyProjectsCubit>().reset();
     }
     if (!context.mounted) return;
     Navigator.pushNamedAndRemoveUntil(

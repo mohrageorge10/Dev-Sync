@@ -227,6 +227,7 @@ class Member {
     required this.role,
     this.teamRole = TeamRole.member,
     this.alsoTrackLeader = false,
+    this.leaderTrack,
     bool? isOwner,
   }) : _isOwnerOverride = isOwner;
 
@@ -236,6 +237,7 @@ class Member {
   final String role;
   final TeamRole teamRole;
   final bool alsoTrackLeader;
+  final String? leaderTrack;
   final bool? _isOwnerOverride;
 
   bool get isOwner => _isOwnerOverride ?? teamRole == TeamRole.owner;
@@ -244,12 +246,28 @@ class Member {
 
   TeamRole get effectiveRole => isOwner ? TeamRole.owner : teamRole;
 
+  // Specific leader badge label (e.g. "Flutter Leader" or fallback "Track Leader").
+  String get leaderBadgeLabel {
+    final t = leaderTrack?.trim() ?? '';
+    if (t.isEmpty) return TeamRole.trackLeader.shortLabel;
+    return t.toLowerCase().endsWith('leader') ? t : '$t Leader';
+  }
+
+  // Primary role badge label for member tiles.
+  String get roleBadgeLabel => switch (effectiveRole) {
+    TeamRole.owner => TeamRole.owner.shortLabel,
+    TeamRole.trackLeader => leaderBadgeLabel,
+    TeamRole.member => TeamRole.member.shortLabel,
+  };
+
   Member copyWith({
     String? name,
     String? handle,
     String? role,
     TeamRole? teamRole,
     bool? alsoTrackLeader,
+    String? leaderTrack,
+    bool clearLeaderTrack = false,
   }) => Member(
     id: id,
     name: name ?? this.name,
@@ -257,6 +275,7 @@ class Member {
     role: role ?? this.role,
     teamRole: teamRole ?? effectiveRole,
     alsoTrackLeader: alsoTrackLeader ?? this.alsoTrackLeader,
+    leaderTrack: clearLeaderTrack ? null : (leaderTrack ?? this.leaderTrack),
   );
 
   // Safe initials derived from non-empty name tokens.
@@ -283,6 +302,7 @@ class Member {
       data['teamRole']?.toString(),
       isOwnerFlag: data[FirebaseConstants.fieldIsOwner] == true,
     );
+    final rawTrack = data['leaderTrack']?.toString().trim();
     return Member(
       id: uid,
       name: rawName.trim().isEmpty ? 'Member' : rawName.trim(),
@@ -293,6 +313,7 @@ class Member {
           .toString(),
       teamRole: parsedRole,
       alsoTrackLeader: data['alsoTrackLeader'] == true,
+      leaderTrack: (rawTrack != null && rawTrack.isNotEmpty) ? rawTrack : null,
     );
   }
 }
@@ -462,6 +483,7 @@ class Team {
     this.ownerId = '',
     this.expectedEndDate,
     this.settings = const TeamSettings(),
+    this.projectTracks = const [],
   });
 
   final String id;
@@ -478,8 +500,41 @@ class Team {
   final String ownerId;
   final DateTime? expectedEndDate;
   final TeamSettings settings;
+  final List<String> projectTracks;
 
   bool get isOwner => role == 'Owner' || role == 'Project Owner';
+
+  // Project-scoped tracks available for assigning Track Leaders.
+  List<String> get availableTracks {
+    final seen = <String>{};
+    final tracks = <String>[];
+    void addTrack(String raw) {
+      final clean = raw.trim();
+      if (clean.isEmpty) return;
+      final key = clean.toLowerCase();
+      if (seen.add(key)) tracks.add(clean);
+    }
+
+    for (final t in projectTracks) {
+      addTrack(t);
+    }
+    for (final m in members) {
+      if (m.leaderTrack != null) addTrack(m.leaderTrack!);
+    }
+    if (tracks.isEmpty) {
+      for (final m in members) {
+        final primary = m.role.split(RegExp(r'[&,/]')).first.trim();
+        if (primary.isNotEmpty && primary.toLowerCase() != 'project owner') {
+          addTrack(primary);
+        }
+      }
+      for (final r in openRoles) {
+        final primary = r.title.split(RegExp(r'[&,/]')).first.trim();
+        if (primary.isNotEmpty) addTrack(primary);
+      }
+    }
+    return tracks;
+  }
 
   int? get daysRemaining {
     if (expectedEndDate == null) return null;
@@ -500,6 +555,7 @@ class Team {
     String? ownerId,
     DateTime? expectedEndDate,
     TeamSettings? settings,
+    List<String>? projectTracks,
   }) => Team(
     id: id,
     name: name ?? this.name,
@@ -515,6 +571,7 @@ class Team {
     ownerId: ownerId ?? this.ownerId,
     expectedEndDate: expectedEndDate ?? this.expectedEndDate,
     settings: settings ?? this.settings,
+    projectTracks: projectTracks ?? this.projectTracks,
   );
 }
 

@@ -45,6 +45,8 @@ class DeveloperModel {
     this.githubUrl,
     this.portfolioUrl,
     this.linkedinUrl,
+    this.cvUrl,
+    this.cvFileName,
     this.projects = const [],
   });
 
@@ -71,9 +73,21 @@ class DeveloperModel {
     final bio = (map[FirebaseConstants.fieldBio] ?? '').toString();
     final handle = map[FirebaseConstants.fieldPublicId]?.toString();
     final hasGithub = map[FirebaseConstants.fieldGithubConnected] == true;
-    final cleanHandle = (handle != null && handle.isNotEmpty)
+    final ghUser = map[FirebaseConstants.fieldGithubUsername]?.toString();
+    final cleanHandle = (ghUser != null && ghUser.trim().isNotEmpty)
+        ? ghUser.trim().replaceAll('@', '')
+        : (handle != null && handle.isNotEmpty)
         ? handle.replaceAll('@', '')
         : id;
+
+    final rawCv = map[FirebaseConstants.fieldCvUrl]?.toString().trim();
+    final rawCvName = map[FirebaseConstants.fieldCvFileName]?.toString().trim();
+    final rawPortfolio = map[FirebaseConstants.fieldPortfolioUrl]
+        ?.toString()
+        .trim();
+    final rawLinkedin = map[FirebaseConstants.fieldLinkedinUrl]
+        ?.toString()
+        .trim();
 
     final matchPercent = (78 + (skills.length * 4)).clamp(75, 98);
 
@@ -94,7 +108,16 @@ class DeveloperModel {
       commitsCount: '${180 + skills.length * 45}',
       projectsCount: '${2 + (skills.length ~/ 2)}',
       githubUrl: hasGithub ? 'https://github.com/$cleanHandle' : null,
-      portfolioUrl: map[FirebaseConstants.fieldCvUrl]?.toString(),
+      portfolioUrl: (rawPortfolio != null && rawPortfolio.isNotEmpty)
+          ? rawPortfolio
+          : null,
+      linkedinUrl: (rawLinkedin != null && rawLinkedin.isNotEmpty)
+          ? rawLinkedin
+          : null,
+      cvUrl: (rawCv != null && rawCv.isNotEmpty) ? rawCv : null,
+      cvFileName: (rawCvName != null && rawCvName.isNotEmpty)
+          ? rawCvName
+          : null,
     );
   }
 
@@ -114,7 +137,11 @@ class DeveloperModel {
   final String? githubUrl;
   final String? portfolioUrl;
   final String? linkedinUrl;
+  final String? cvUrl;
+  final String? cvFileName;
   final List<PortfolioProjectData> projects;
+
+  bool get hasCv => cvUrl != null && cvUrl!.trim().isNotEmpty;
 
   // Normalized @handle for display.
   String get handle {
@@ -156,11 +183,15 @@ class DeveloperModel {
       }
     }
 
+    final archLabel = role.length <= 16
+        ? '$role Architecture'
+        : 'System Architecture';
+
     return {
       if (langs.isNotEmpty) 'LANGUAGES': langs,
       'FRAMEWORKS & TOOLS': tools.isNotEmpty ? tools : skills,
       'LEADERSHIP & COLLABORATION': [
-        '$role Architecture',
+        archLabel,
         'Agile Sprints',
         if (level.toLowerCase() == 'advanced') 'Team Mentorship',
         'Code Reviews',
