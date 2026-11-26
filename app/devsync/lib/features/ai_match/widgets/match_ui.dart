@@ -1,10 +1,9 @@
-import 'package:devsync/core/shared/feedback/app_feedback.dart';
+import 'package:devsync/core/shared/app_bar/custom_app_bar.dart';
 import 'package:devsync/core/theme/app_colors.dart';
 import 'package:devsync/core/theme/app_styles.dart';
-import 'package:devsync/features/ai_match/utils/ai_match_strings.dart';
 import 'package:flutter/material.dart';
 
-/// App bar of the redesigned AI Match screens: back, title, bell, avatar.
+// Unified top app bar for AI Match screens delegating to CustomAppBar.
 class MatchTopBar extends StatelessWidget implements PreferredSizeWidget {
   const MatchTopBar({super.key, required this.title});
 
@@ -16,34 +15,13 @@ class MatchTopBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return AppBar(
-      backgroundColor: c.backgroundPrimary,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      titleSpacing: 0,
+    return CustomAppBar(
+      title: title,
+      showActions: false,
       leading: IconButton(
         icon: Icon(Icons.arrow_back_rounded, color: c.textPrimary),
         onPressed: () => Navigator.maybePop(context),
       ),
-      title: Text(title, style: AppStyles.title16Bold(context)),
-      actions: [
-        IconButton(
-          icon: Icon(Icons.notifications_none_rounded, color: c.textPrimary),
-          onPressed: () => AppFeedback.show(
-            context,
-            message: AiMatchStrings.comingSoon,
-            type: AppFeedbackType.info,
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.only(left: 4, right: 16),
-          child: CircleAvatar(
-            radius: 14,
-            backgroundColor: c.primary,
-            child: Icon(Icons.person_rounded, size: 16, color: c.onPrimary),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -123,30 +101,46 @@ class MatchTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (showDot) ...[
-            Container(
-              width: 5,
-              height: 5,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 5),
-          ],
-          if (icon != null) ...[
-            Icon(icon, size: 12, color: color),
-            const SizedBox(width: 4),
-          ],
-          Text(label, style: AppStyles.caption10Bold(context, color: color)),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final labelWidget = Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: AppStyles.caption10Bold(context, color: color),
+        );
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showDot) ...[
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 5),
+              ],
+              if (icon != null) ...[
+                Icon(icon, size: 12, color: color),
+                const SizedBox(width: 4),
+              ],
+              if (constraints.hasBoundedWidth)
+                Flexible(child: labelWidget)
+              else
+                labelWidget,
+            ],
+          ),
+        );
+      },
     );
   }
 }

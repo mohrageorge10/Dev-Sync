@@ -1,6 +1,7 @@
+import 'package:devsync/core/di/service_locator.dart';
 import 'package:devsync/core/routing/app_routes.dart';
 import 'package:devsync/core/shared/buttons/app_secondary_button.dart';
-import 'package:devsync/core/shared/feedback/app_feedback.dart';
+import 'package:devsync/core/shared/sheets/login_required_sheet.dart';
 import 'package:devsync/core/shared/tap_bars/app_segmented_control.dart';
 import 'package:devsync/core/theme/app_colors.dart';
 import 'package:devsync/core/theme/app_styles.dart';
@@ -13,7 +14,9 @@ import 'package:devsync/features/ai_match/utils/ai_match_strings.dart';
 import 'package:devsync/features/ai_match/widgets/match_history_card.dart';
 import 'package:devsync/features/ai_match/widgets/match_ui.dart';
 import 'package:devsync/features/ai_match/widgets/profile_tip_banner.dart';
-import 'package:devsync/features/auth/screens/login_required_bottom_sheet.dart';
+import 'package:devsync/features/discover_project/data/model/project_model.dart';
+import 'package:devsync/features/discover_project/presentation/cubit/discover/discover_cubit.dart';
+import 'package:devsync/features/profile/presentation/cubit/profile_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -39,20 +42,66 @@ class _MatchHistoryScreenState extends State<MatchHistoryScreen> {
   void _openWhy(MatchModel match) =>
       Navigator.pushNamed(context, AppRoutes.matchWhy, arguments: match);
 
-  void _comingSoon() => AppFeedback.show(
-        context,
-        message: AiMatchStrings.comingSoon,
-        type: AppFeedbackType.info,
-      );
-
-  // Signed out: the profile needs an account first. Signed in: the profile
-  // screen is not built yet.
-  void _completeProfile(bool signedIn) {
-    if (signedIn) {
-      _comingSoon(); // TODO: open the profile screen
-    } else {
-      showLoginRequiredSheet(context);
+  // Open the matched project in ProjectDetailsScreen (uses DiscoverCubit if loaded).
+  void _openProject(MatchModel match) {
+    ProjectModel? resolved;
+    if (ServiceLocator.isRegistered<DiscoverCubit>()) {
+      resolved = ServiceLocator.get<DiscoverCubit>()
+          .state
+          .allProjects
+          .where((p) => p.id == match.projectId)
+          .firstOrNull;
     }
+    resolved ??= ProjectModel(
+      id: match.projectId,
+      title: match.projectTitle,
+      icon: Icons.rocket_launch_outlined,
+      type: match.purpose.name == 'real' ? 'Real-world' : 'Learning',
+      matchPercent: match.score,
+      createdAgo: 'Recently matched',
+      ageHours: 2,
+      status: 'Open for Contributors',
+      description: match.projectDescription,
+      matchReason: match.explanation.isNotEmpty
+          ? match.explanation
+          : 'Matches your verified tech stack',
+      tags: [...match.matchedSkills, ...match.missingSkills],
+      tracks: [
+        if (match.matchedTrack.isNotEmpty) match.matchedTrack else 'Mobile',
+      ],
+      openTracks: [
+        if (match.matchedTrack.isNotEmpty) match.matchedTrack else 'Mobile',
+      ],
+      difficulty: 'Intermediate',
+      members: 2,
+      maxMembers: 5,
+      needs: match.matchedTrack.isNotEmpty
+          ? match.matchedTrack
+          : 'Contributor',
+    );
+    Navigator.of(context).pushNamed(
+      AppRoutes.projectDetails,
+      arguments: resolved,
+    );
+  }
+
+  // Open Complete Profile when signed in, or login sheet when guest.
+  Future<void> _completeProfile(bool signedIn) async {
+    if (!signedIn) {
+      LoginRequiredSheet.show(
+        context,
+        message: 'Log in to complete your developer profile.',
+      );
+      return;
+    }
+    if (ServiceLocator.isRegistered<ProfileController>()) {
+      await ServiceLocator.get<ProfileController>().loadProfile();
+    }
+    if (!mounted) return;
+    await Navigator.of(context).pushNamed(AppRoutes.profileComplete);
+    if (!mounted) return;
+    context.read<ProfileTipCubit>().load();
+    context.read<MatchCubit>().load(silent: true);
   }
 
   @override
@@ -158,7 +207,7 @@ class _MatchHistoryScreenState extends State<MatchHistoryScreen> {
                   for (final m in shown) ...[
                     MatchHistoryCard(
                       match: m,
-                      onOpenProject: _comingSoon, // TODO: project details
+                      onOpenProject: () => _openProject(m),
                       onWhy: () => _openWhy(m),
                     ),
                     const SizedBox(height: 12),

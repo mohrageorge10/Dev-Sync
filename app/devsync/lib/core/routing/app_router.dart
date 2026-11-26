@@ -5,6 +5,7 @@ import 'package:devsync/core/di/service_locator.dart';
 import 'package:devsync/core/routing/app_routes.dart';
 import 'package:devsync/core/static/on_boarding/screens/on_boarding.dart';
 import 'package:devsync/core/static/splash/Splash.dart';
+import 'package:devsync/features/ai_match/business_logic/match_actions_cubit.dart';
 import 'package:devsync/features/ai_match/business_logic/match_cubit.dart';
 import 'package:devsync/features/ai_match/business_logic/profile_tip_cubit.dart';
 import 'package:devsync/features/ai_match/data/models/match_model.dart';
@@ -209,6 +210,19 @@ class AppRouter {
         );
 
       case AppRoutes.skillGap:
+        final args = settings.arguments;
+        if (args is ({MatchModel match, MatchActionsCubit actionsCubit})) {
+          return AppPageRoute(
+            builder: (_) => BlocProvider.value(
+              value: args.actionsCubit,
+              child: SkillGapScreen(
+                match: args.match,
+                useProvidedActionsCubit: true,
+              ),
+            ),
+            settings: settings,
+          );
+        }
         return AppPageRoute(
           builder: (_) =>
               SkillGapScreen(match: settings.arguments as MatchModel),

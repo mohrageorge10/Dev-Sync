@@ -2,7 +2,6 @@ import 'package:devsync/core/di/service_locator.dart';
 import 'package:devsync/core/routing/app_routes.dart';
 import 'package:devsync/core/shared/app_bar/custom_app_bar.dart';
 import 'package:devsync/core/shared/app_bar/devsync_logo.dart';
-import 'package:devsync/core/shared/feedback/app_feedback.dart';
 import 'package:devsync/core/shared/headers/header.dart';
 import 'package:devsync/core/shared/input_fields/app_search_field.dart';
 import 'package:devsync/core/theme/app_colors.dart';
@@ -32,10 +31,8 @@ class _HomeView extends StatelessWidget {
 
   void _openSearch(BuildContext context, {int initialTab = 0}) {
     context.read<DiscoverCubit>().setTab(initialTab);
-    Navigator.of(context).pushNamed(
-      AppRoutes.discoverSearch,
-      arguments: initialTab,
-    );
+    Navigator.of(context)
+        .pushNamed(AppRoutes.discoverSearch, arguments: initialTab);
   }
 
   @override
@@ -47,10 +44,7 @@ class _HomeView extends StatelessWidget {
       backgroundColor: c.backgroundPrimary,
       appBar: const CustomAppBar(
         title: 'DevSync',
-        leading: Align(
-          alignment: Alignment.center,
-          child: DevSyncLogo(),
-        ),
+        leading: Align(alignment: Alignment.center, child: DevSyncLogo()),
       ),
       body: RefreshIndicator(
         onRefresh: cubit.loadData,
@@ -67,11 +61,8 @@ class _HomeView extends StatelessWidget {
                   builder: (context, state) => WelcomeHeader(
                     greeting: state.greeting,
                     userName: state.userName,
-                    onAiTap: () => AppFeedback.show(
-                      context,
-                      title: 'AI Match Assistant',
-                      message: 'AI-powered project matching is coming soon.',
-                    ),
+                    onAiTap: () =>
+                        Navigator.of(context).pushNamed(AppRoutes.matchHistory),
                   ),
                 ),
 
@@ -98,9 +89,8 @@ class _HomeView extends StatelessWidget {
                         await ServiceLocator.get<ProfileController>()
                             .loadProfile();
                         if (!context.mounted) return;
-                        await Navigator.of(
-                          context,
-                        ).pushNamed(AppRoutes.profileComplete);
+                        await Navigator.of(context)
+                            .pushNamed(AppRoutes.profileComplete);
                         if (context.mounted) cubit.loadData();
                       },
                     );

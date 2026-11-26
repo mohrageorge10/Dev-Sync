@@ -1,25 +1,34 @@
 import 'package:devsync/core/shared/feedback/app_feedback.dart';
+import 'package:devsync/core/shared/sheets/login_required_sheet.dart';
 import 'package:devsync/core/theme/app_colors.dart';
+import 'package:devsync/core/theme/app_styles.dart';
 import 'package:devsync/core/utils/devsync_enums.dart';
 import 'package:devsync/features/ai_match/business_logic/match_actions_state.dart';
 import 'package:devsync/features/ai_match/utils/ai_match_strings.dart';
-import 'package:devsync/features/auth/screens/login_required_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 
-/// Shows the one-time message of [MatchActionsState.event]
-/// (snack bar, or the login sheet when the user is signed out).
+// Shows one-time feedback or the unified login sheet for MatchActionsState events.
 void handleMatchActionEvent(BuildContext context, MatchActionEvent e) {
   switch (e.kind) {
     case MatchActionEventKind.needsLogin:
-      showLoginRequiredSheet(context);
+      LoginRequiredSheet.show(
+        context,
+        message: 'Log in to save projects or request to join teams.',
+      );
     case MatchActionEventKind.saved:
     case MatchActionEventKind.unsaved:
     case MatchActionEventKind.requestSent:
-      AppFeedback.show(context,
-          message: e.message, type: AppFeedbackType.success);
+      AppFeedback.show(
+        context,
+        message: e.message,
+        type: AppFeedbackType.success,
+      );
     case MatchActionEventKind.error:
-      AppFeedback.show(context,
-          message: e.message, type: AppFeedbackType.error);
+      AppFeedback.show(
+        context,
+        message: e.message,
+        type: AppFeedbackType.error,
+      );
   }
 }
 
@@ -114,47 +123,43 @@ class MatchActionButton extends StatelessWidget {
       fg = enabled ? c.textPrimary : c.textSecondary;
       bg = c.subtleBlueSurface;
     }
-    return GestureDetector(
-      onTap: enabled ? onTap : null,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        height: 48,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (loading) ...[
-              SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: fg),
-              ),
-              const SizedBox(width: 8),
-            ] else if (leadingIcon != null) ...[
-              Icon(leadingIcon, size: 17, color: fg),
-              const SizedBox(width: 6),
-            ],
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: fg,
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(12),
+        child: SizedBox(
+          height: 48,
+          width: double.infinity,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (loading) ...[
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: fg),
+                ),
+                const SizedBox(width: 8),
+              ] else if (leadingIcon != null) ...[
+                Icon(leadingIcon, size: 17, color: fg),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppStyles.body14Bold(context, color: fg),
                 ),
               ),
-            ),
-            if (!loading && trailingIcon != null) ...[
-              const SizedBox(width: 6),
-              Icon(trailingIcon, size: 17, color: fg),
+              if (!loading && trailingIcon != null) ...[
+                const SizedBox(width: 6),
+                Icon(trailingIcon, size: 17, color: fg),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

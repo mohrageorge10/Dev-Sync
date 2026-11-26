@@ -1,10 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:devsync/core/di/service_locator.dart';
 import 'package:devsync/core/services/firebase/firebase_auth_service.dart';
 import 'package:devsync/core/services/firebase/firebase_constants.dart';
 import 'package:devsync/core/services/firebase/firestore_service.dart';
 import 'package:devsync/core/utils/devsync_enums.dart';
 import 'package:devsync/features/ai_match/data/models/match_feedback.dart';
 import 'package:devsync/features/ai_match/data/models/match_model.dart';
+import 'package:devsync/features/discover_project/presentation/cubit/discover/discover_cubit.dart';
+import 'package:devsync/features/my_projects/presentation/cubit/my_projects_cubit.dart';
 
 abstract class MatchRepo {
   /// Matches of the signed-in user, best score first.
@@ -78,12 +81,122 @@ class FirestoreMatchRepo implements MatchRepo {
             q.orderBy(FirebaseConstants.fieldScore, descending: true),
       ).timeout(_netTimeout);
       final loaded = docs.map(MatchModel.fromFirestore).toList();
-      if (loaded.isNotEmpty || !_sampleDataFallback) return loaded;
+      if (loaded.isNotEmpty) return loaded;
+
+      // Compute real on-device matches from Firestore projects when backend matches are not generated yet.
+      final computed = await _computeSmartMatches(uid);
+      if (computed.isNotEmpty) return computed;
+      if (!_sampleDataFallback) return const [];
     } catch (_) {
       // Real error screen ("Try again") unless sample data is turned on.
       if (!_sampleDataFallback) rethrow;
     }
     return _fallback.getMatches();
+  }
+
+  // On-device smart matching against real Firestore open projects using user's skills & track.
+  Future<List<MatchModel>> _computeSmartMatches(String uid) async {
+    final userDoc = await _firestore
+        .getDocument(
+          collectionPath: FirebaseConstants.usersCollection,
+          docId: uid,
+        )
+        .timeout(_netTimeout);
+    final rawUserSkills = userDoc?[FirebaseConstants.fieldSkills];
+    final userSkills = <String>{
+      if (rawUserSkills is Iterable)
+        for (final s in rawUserSkills) s.toString().trim().toLowerCase(),
+    };
+    final userTrack = (userDoc?[FirebaseConstants.fieldTrack] ?? '')
+        .toString()
+        .trim()
+        .toLowerCase();
+
+    final projectDocs = await _firestore
+        .getCollection(
+          collectionPath: FirebaseConstants.projectsCollection,
+          queryBuilder: (q) => q
+              .where(FirebaseConstants.fieldStatus, isEqualTo: 'open')
+              .limit(20),
+        )
+        .timeout(_netTimeout);
+
+    final results = <MatchModel>[];
+    for (final p in projectDocs) {
+      final pid = (p['id'] ?? '').toString();
+      final ownerId = (p[FirebaseConstants.fieldOwnerId] ?? '').toString();
+      if (pid.isEmpty || ownerId == uid) continue;
+
+      final title = (p[FirebaseConstants.fieldTitle] ?? 'Project').toString();
+      final desc = (p[FirebaseConstants.fieldDescription] ?? '').toString();
+      final rawStack = p[FirebaseConstants.fieldTechStack];
+      final stack = <String>[
+        if (rawStack is Iterable)
+          for (final s in rawStack)
+            if (s.toString().trim().isNotEmpty) s.toString().trim(),
+      ];
+      final rawTracks = p[FirebaseConstants.fieldOpenTrackKeys];
+      final tracks = <String>[
+        if (rawTracks is Iterable)
+          for (final t in rawTracks) t.toString().trim(),
+      ];
+
+      final matched = <String>[];
+      final missing = <String>[];
+      for (final skill in stack) {
+        if (userSkills.contains(skill.toLowerCase())) {
+          matched.add(skill);
+        } else {
+          missing.add(skill);
+        }
+      }
+
+      final trackMatches = userTrack.isNotEmpty &&
+          tracks.any((t) => t.toLowerCase().contains(userTrack));
+      final ratio = stack.isEmpty ? 0.5 : matched.length / stack.length;
+      final score = (45 + (ratio * 42) + (trackMatches ? 11 : 0))
+          .round()
+          .clamp(45, 98);
+
+      final rawPurpose =
+          (p[FirebaseConstants.fieldPurpose] ?? '').toString().toLowerCase();
+      final purpose = rawPurpose == ProjectPurpose.real.name
+          ? ProjectPurpose.real
+          : ProjectPurpose.learning;
+
+      final ownerSnap = p[FirebaseConstants.fieldOwnerSnapshot];
+      final ownerName = ownerSnap is Map
+          ? (ownerSnap[FirebaseConstants.fieldName] ?? 'Project Lead').toString()
+          : 'Project Lead';
+
+      results.add(
+        MatchModel(
+          projectId: pid,
+          projectTitle: title,
+          projectDescription: desc,
+          purpose: purpose,
+          score: score,
+          leadMaintainer: ownerName,
+          matchedTrack: tracks.isNotEmpty ? tracks.first : 'Contributor',
+          matchedSkills: matched,
+          missingSkills: missing,
+          explanation: matched.isNotEmpty
+              ? 'You already match ${matched.length} of ${stack.length} required skills (${matched.take(3).join(', ')}).'
+              : 'Great growth opportunity to build hands-on experience with ${stack.take(3).join(', ')}.',
+          source: MatchSource.fallback,
+          learningTips: [
+            for (final m in missing.take(3))
+              LearningTip(
+                skill: m,
+                tip: 'Review $m fundamentals and check the project repository setup before your first PR.',
+                firstStep: 'Explore how $m is used in "$title".',
+              ),
+          ],
+        ),
+      );
+    }
+    results.sort((a, b) => b.score.compareTo(a.score));
+    return results;
   }
 
   @override
@@ -149,6 +262,9 @@ class FirestoreMatchRepo implements MatchRepo {
         docId: match.projectId,
       ).timeout(_netTimeout);
     }
+    if (ServiceLocator.isRegistered<DiscoverCubit>()) {
+      ServiceLocator.get<DiscoverCubit>().loadData();
+    }
   }
 
   @override
@@ -205,26 +321,38 @@ class FirestoreMatchRepo implements MatchRepo {
       collectionPath: FirebaseConstants.requestsCollection,
       docId: docId,
       merge: false,
-      // CHECK the field names with docs/schema.md.
       data: {
         FirebaseConstants.fieldProjectId: match.projectId,
         FirebaseConstants.fieldProjectTitle: match.projectTitle,
         FirebaseConstants.fieldOwnerId: ownerId,
         FirebaseConstants.fieldApplicantId: uid,
+        FirebaseConstants.fieldTrack: match.matchedTrack.isNotEmpty
+            ? match.matchedTrack
+            : (me?[FirebaseConstants.fieldTrack] ?? 'Contributor').toString(),
         FirebaseConstants.fieldPitch: pitch,
         FirebaseConstants.fieldApplicantSnapshot: {
           FirebaseConstants.fieldName: me?[FirebaseConstants.fieldName] ??
               _auth.currentUser?.displayName ??
               '',
+          FirebaseConstants.fieldPublicId:
+              me?[FirebaseConstants.fieldPublicId] ?? '',
           FirebaseConstants.fieldPhotoUrl:
               me?[FirebaseConstants.fieldPhotoUrl] ?? '',
           FirebaseConstants.fieldTrack: me?[FirebaseConstants.fieldTrack] ?? '',
           FirebaseConstants.fieldLevel: me?[FirebaseConstants.fieldLevel] ?? '',
+          FirebaseConstants.fieldSkills:
+              me?[FirebaseConstants.fieldSkills] ?? const <String>[],
         },
         FirebaseConstants.fieldStatus: RequestStatus.pending.name,
         FirebaseConstants.fieldCreatedAt: FieldValue.serverTimestamp(),
       },
     ).timeout(_netTimeout);
+    if (ServiceLocator.isRegistered<DiscoverCubit>()) {
+      ServiceLocator.get<DiscoverCubit>().loadData();
+    }
+    if (ServiceLocator.isRegistered<MyProjectsCubit>()) {
+      ServiceLocator.get<MyProjectsCubit>().loadData();
+    }
   }
 }
 
