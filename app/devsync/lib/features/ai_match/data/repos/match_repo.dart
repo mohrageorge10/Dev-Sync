@@ -54,11 +54,10 @@ class FirestoreMatchRepo implements MatchRepo {
     required FirestoreService firestoreService,
     required FirebaseAuthService authService,
     MatchRepo? fallback,
-    bool sampleDataFallback = false,
-  })  : _firestore = firestoreService,
-        _auth = authService,
-        _fallback = fallback ?? MockMatchRepo(),
-        _sampleDataFallback = sampleDataFallback;
+    this._sampleDataFallback = false,
+  }) : _firestore = firestoreService,
+       _auth = authService,
+       _fallback = fallback ?? MockMatchRepo();
 
   final FirestoreService _firestore;
   final FirebaseAuthService _auth;
@@ -91,12 +90,15 @@ class FirestoreMatchRepo implements MatchRepo {
     // Signed out: sample projects, as a preview of the feature.
     if (uid == null) return _fallback.getMatches();
     try {
-      final docs = await _firestore.getCollection(
-        collectionPath: '${FirebaseConstants.matchesCollection}/$uid/'
-            '${FirebaseConstants.matchItemsCollection}',
-        queryBuilder: (q) =>
-            q.orderBy(FirebaseConstants.fieldScore, descending: true),
-      ).timeout(_netTimeout);
+      final docs = await _firestore
+          .getCollection(
+            collectionPath:
+                '${FirebaseConstants.matchesCollection}/$uid/'
+                '${FirebaseConstants.matchItemsCollection}',
+            queryBuilder: (q) =>
+                q.orderBy(FirebaseConstants.fieldScore, descending: true),
+          )
+          .timeout(_netTimeout);
       final loaded = docs.map(MatchModel.fromFirestore).toList();
       if (loaded.isNotEmpty) return loaded;
 
@@ -168,22 +170,26 @@ class FirestoreMatchRepo implements MatchRepo {
         }
       }
 
-      final trackMatches = userTrack.isNotEmpty &&
+      final trackMatches =
+          userTrack.isNotEmpty &&
           tracks.any((t) => t.toLowerCase().contains(userTrack));
       final ratio = stack.isEmpty ? 0.5 : matched.length / stack.length;
-      final score = (45 + (ratio * 42) + (trackMatches ? 11 : 0))
-          .round()
-          .clamp(45, 98);
+      final score = (45 + (ratio * 42) + (trackMatches ? 11 : 0)).round().clamp(
+        45,
+        98,
+      );
 
-      final rawPurpose =
-          (p[FirebaseConstants.fieldPurpose] ?? '').toString().toLowerCase();
+      final rawPurpose = (p[FirebaseConstants.fieldPurpose] ?? '')
+          .toString()
+          .toLowerCase();
       final purpose = rawPurpose == ProjectPurpose.real.name
           ? ProjectPurpose.real
           : ProjectPurpose.learning;
 
       final ownerSnap = p[FirebaseConstants.fieldOwnerSnapshot];
       final ownerName = ownerSnap is Map
-          ? (ownerSnap[FirebaseConstants.fieldName] ?? 'Project Lead').toString()
+          ? (ownerSnap[FirebaseConstants.fieldName] ?? 'Project Lead')
+                .toString()
           : 'Project Lead';
 
       results.add(
@@ -205,7 +211,8 @@ class FirestoreMatchRepo implements MatchRepo {
             for (final m in missing.take(3))
               LearningTip(
                 skill: m,
-                tip: 'Review $m fundamentals and check the project repository setup before your first PR.',
+                tip:
+                    'Review $m fundamentals and check the project repository setup before your first PR.',
                 firstStep: 'Explore how $m is used in "$title".',
               ),
           ],
@@ -220,25 +227,28 @@ class FirestoreMatchRepo implements MatchRepo {
   Future<void> submitFeedback(MatchFeedback feedback) async {
     final uid = _auth.currentUserId;
     if (uid == null) return;
-    await _firestore.addDocument(
-      collectionPath: FirebaseConstants.feedbackCollection,
-      data: {
-        FirebaseConstants.fieldUid: uid,
-        FirebaseConstants.fieldProjectId: feedback.projectId,
-        FirebaseConstants.fieldKind: feedback.kind.name,
-        FirebaseConstants.fieldHelpful: feedback.helpful,
-        FirebaseConstants.fieldClarity: feedback.clarity,
-        // Check the exact shape of `reason` / `comment` in docs/schema.md.
-        FirebaseConstants.fieldReason: feedback.reasons.join(', '),
-        'comment': feedback.comment,
-        FirebaseConstants.fieldCreatedAt: FieldValue.serverTimestamp(),
-      },
-    ).timeout(_netTimeout);
+    await _firestore
+        .addDocument(
+          collectionPath: FirebaseConstants.feedbackCollection,
+          data: {
+            FirebaseConstants.fieldUid: uid,
+            FirebaseConstants.fieldProjectId: feedback.projectId,
+            FirebaseConstants.fieldKind: feedback.kind.name,
+            FirebaseConstants.fieldHelpful: feedback.helpful,
+            FirebaseConstants.fieldClarity: feedback.clarity,
+            // Check the exact shape of `reason` / `comment` in docs/schema.md.
+            FirebaseConstants.fieldReason: feedback.reasons.join(', '),
+            'comment': feedback.comment,
+            FirebaseConstants.fieldCreatedAt: FieldValue.serverTimestamp(),
+          },
+        )
+        .timeout(_netTimeout);
   }
 
   // ---------------- Project actions ----------------
 
-  String _savedPath(String uid) => '${FirebaseConstants.usersCollection}/$uid/'
+  String _savedPath(String uid) =>
+      '${FirebaseConstants.usersCollection}/$uid/'
       '${FirebaseConstants.savedCollection}'; // CHECK with docs/schema.md
 
   String _requireUid() {
@@ -253,10 +263,9 @@ class FirestoreMatchRepo implements MatchRepo {
   Future<bool> isSaved(String projectId) async {
     final uid = _auth.currentUserId;
     if (uid == null) return false;
-    final doc = await _firestore.getDocument(
-      collectionPath: _savedPath(uid),
-      docId: projectId,
-    ).timeout(_netTimeout);
+    final doc = await _firestore
+        .getDocument(collectionPath: _savedPath(uid), docId: projectId)
+        .timeout(_netTimeout);
     return doc != null;
   }
 
@@ -264,20 +273,24 @@ class FirestoreMatchRepo implements MatchRepo {
   Future<void> setSaved(MatchModel match, bool saved) async {
     final uid = _requireUid();
     if (saved) {
-      await _firestore.setDocument(
-        collectionPath: _savedPath(uid),
-        docId: match.projectId,
-        data: {
-          FirebaseConstants.fieldProjectId: match.projectId,
-          FirebaseConstants.fieldProjectTitle: match.projectTitle,
-          FirebaseConstants.fieldSavedAt: FieldValue.serverTimestamp(),
-        },
-      ).timeout(_netTimeout);
+      await _firestore
+          .setDocument(
+            collectionPath: _savedPath(uid),
+            docId: match.projectId,
+            data: {
+              FirebaseConstants.fieldProjectId: match.projectId,
+              FirebaseConstants.fieldProjectTitle: match.projectTitle,
+              FirebaseConstants.fieldSavedAt: FieldValue.serverTimestamp(),
+            },
+          )
+          .timeout(_netTimeout);
     } else {
-      await _firestore.deleteDocument(
-        collectionPath: _savedPath(uid),
-        docId: match.projectId,
-      ).timeout(_netTimeout);
+      await _firestore
+          .deleteDocument(
+            collectionPath: _savedPath(uid),
+            docId: match.projectId,
+          )
+          .timeout(_netTimeout);
     }
     if (ServiceLocator.isRegistered<DiscoverCubit>()) {
       ServiceLocator.get<DiscoverCubit>().loadData();
@@ -288,10 +301,12 @@ class FirestoreMatchRepo implements MatchRepo {
   Future<RequestStatus?> getJoinRequestStatus(String projectId) async {
     final uid = _auth.currentUserId;
     if (uid == null) return null;
-    final doc = await _firestore.getDocument(
-      collectionPath: FirebaseConstants.requestsCollection,
-      docId: FirebaseConstants.requestDocId(projectId, uid),
-    ).timeout(_netTimeout);
+    final doc = await _firestore
+        .getDocument(
+          collectionPath: FirebaseConstants.requestsCollection,
+          docId: FirebaseConstants.requestDocId(projectId, uid),
+        )
+        .timeout(_netTimeout);
     if (doc == null) return null;
     final name = doc[FirebaseConstants.fieldStatus];
     for (final s in RequestStatus.values) {
@@ -306,18 +321,22 @@ class FirestoreMatchRepo implements MatchRepo {
     final docId = FirebaseConstants.requestDocId(match.projectId, uid);
 
     // One request per project and user (the doc id is projectId_uid).
-    final existing = await _firestore.getDocument(
-      collectionPath: FirebaseConstants.requestsCollection,
-      docId: docId,
-    ).timeout(_netTimeout);
+    final existing = await _firestore
+        .getDocument(
+          collectionPath: FirebaseConstants.requestsCollection,
+          docId: docId,
+        )
+        .timeout(_netTimeout);
     if (existing != null) {
       throw const MatchActionException(MatchActionError.alreadyRequested);
     }
 
-    final project = await _firestore.getDocument(
-      collectionPath: FirebaseConstants.projectsCollection,
-      docId: match.projectId,
-    ).timeout(_netTimeout);
+    final project = await _firestore
+        .getDocument(
+          collectionPath: FirebaseConstants.projectsCollection,
+          docId: match.projectId,
+        )
+        .timeout(_netTimeout);
     if (project == null) {
       throw const MatchActionException(MatchActionError.projectNotFound);
     }
@@ -330,40 +349,48 @@ class FirestoreMatchRepo implements MatchRepo {
       throw const MatchActionException(MatchActionError.projectClosed);
     }
 
-    final me = await _firestore.getDocument(
-      collectionPath: FirebaseConstants.usersCollection,
-      docId: uid,
-    ).timeout(_netTimeout);
-    await _firestore.setDocument(
-      collectionPath: FirebaseConstants.requestsCollection,
-      docId: docId,
-      merge: false,
-      data: {
-        FirebaseConstants.fieldProjectId: match.projectId,
-        FirebaseConstants.fieldProjectTitle: match.projectTitle,
-        FirebaseConstants.fieldOwnerId: ownerId,
-        FirebaseConstants.fieldApplicantId: uid,
-        FirebaseConstants.fieldTrack: match.matchedTrack.isNotEmpty
-            ? match.matchedTrack
-            : (me?[FirebaseConstants.fieldTrack] ?? 'Contributor').toString(),
-        FirebaseConstants.fieldPitch: pitch,
-        FirebaseConstants.fieldApplicantSnapshot: {
-          FirebaseConstants.fieldName: me?[FirebaseConstants.fieldName] ??
-              _auth.currentUser?.displayName ??
-              '',
-          FirebaseConstants.fieldPublicId:
-              me?[FirebaseConstants.fieldPublicId] ?? '',
-          FirebaseConstants.fieldPhotoUrl:
-              me?[FirebaseConstants.fieldPhotoUrl] ?? '',
-          FirebaseConstants.fieldTrack: me?[FirebaseConstants.fieldTrack] ?? '',
-          FirebaseConstants.fieldLevel: me?[FirebaseConstants.fieldLevel] ?? '',
-          FirebaseConstants.fieldSkills:
-              me?[FirebaseConstants.fieldSkills] ?? const <String>[],
-        },
-        FirebaseConstants.fieldStatus: RequestStatus.pending.name,
-        FirebaseConstants.fieldCreatedAt: FieldValue.serverTimestamp(),
-      },
-    ).timeout(_netTimeout);
+    final me = await _firestore
+        .getDocument(
+          collectionPath: FirebaseConstants.usersCollection,
+          docId: uid,
+        )
+        .timeout(_netTimeout);
+    await _firestore
+        .setDocument(
+          collectionPath: FirebaseConstants.requestsCollection,
+          docId: docId,
+          merge: false,
+          data: {
+            FirebaseConstants.fieldProjectId: match.projectId,
+            FirebaseConstants.fieldProjectTitle: match.projectTitle,
+            FirebaseConstants.fieldOwnerId: ownerId,
+            FirebaseConstants.fieldApplicantId: uid,
+            FirebaseConstants.fieldTrack: match.matchedTrack.isNotEmpty
+                ? match.matchedTrack
+                : (me?[FirebaseConstants.fieldTrack] ?? 'Contributor')
+                      .toString(),
+            FirebaseConstants.fieldPitch: pitch,
+            FirebaseConstants.fieldApplicantSnapshot: {
+              FirebaseConstants.fieldName:
+                  me?[FirebaseConstants.fieldName] ??
+                  _auth.currentUser?.displayName ??
+                  '',
+              FirebaseConstants.fieldPublicId:
+                  me?[FirebaseConstants.fieldPublicId] ?? '',
+              FirebaseConstants.fieldPhotoUrl:
+                  me?[FirebaseConstants.fieldPhotoUrl] ?? '',
+              FirebaseConstants.fieldTrack:
+                  me?[FirebaseConstants.fieldTrack] ?? '',
+              FirebaseConstants.fieldLevel:
+                  me?[FirebaseConstants.fieldLevel] ?? '',
+              FirebaseConstants.fieldSkills:
+                  me?[FirebaseConstants.fieldSkills] ?? const <String>[],
+            },
+            FirebaseConstants.fieldStatus: RequestStatus.pending.name,
+            FirebaseConstants.fieldCreatedAt: FieldValue.serverTimestamp(),
+          },
+        )
+        .timeout(_netTimeout);
     if (ServiceLocator.isRegistered<DiscoverCubit>()) {
       ServiceLocator.get<DiscoverCubit>().loadData();
     }
@@ -380,135 +407,138 @@ class MockMatchRepo implements MatchRepo {
 
   @override
   Future<List<MatchModel>> getMatches() async => [
-        MatchModel(
-          projectId: 'p1',
-          projectTitle: 'EcoTrack Mobile: Carbon Analytics for IoT arrays',
-          projectDescription: 'Track and reduce your carbon footprint.',
-          purpose: ProjectPurpose.real,
-          score: 92,
-          leadMaintainer: 'Alex Rivera (@rivera-dev)',
-          sprintLabel: 'Sprint Cycle 14',
-          matchedSkills: const [
-            'Flutter',
-            'Dart',
-            'REST APIs',
-            'Git & GitHub Workflows',
-          ],
-          missingSkills: const ['Sensor Telemetry', 'Bluetooth Low Energy (BLE)'],
-          complementarySkills: const [
-            'Riverpod State Management',
-            'Offline Storage',
-            'Async / Await',
-          ],
-          learnPoints: const [
-            'Hardware sensor integration with low-energy Bluetooth (BLE) '
-                'peripheral beacons.',
-            'High-volume timeseries data parsing and query indexing in '
-                'client-side SQLite.',
-            'Collaborative agile workflows and pull request reviews in a '
-                'production open-source codebase.',
-          ],
-          skillDetails: const [
-            SkillDetail(
-              skill: 'Flutter',
-              level: 'Intermediate',
-              note: 'Verified from 14 commits in personal repositories',
-            ),
-            SkillDetail(
-              skill: 'Dart',
-              level: 'Intermediate',
-              note: 'Matched directly to target repository language',
-            ),
-            SkillDetail(
-              skill: 'REST APIs',
-              level: 'Architecture',
-              note: 'Experienced with serialization & state sync patterns',
-            ),
-            SkillDetail(
-              skill: 'Git & GitHub Workflows',
-              level: 'Collaborative',
-              note: 'Track record of clean PR branches and squash merges',
-            ),
-          ],
-          learningTips: const [
-            LearningTip(
-              skill: 'Sensor Telemetry & Time-series Data',
-              tip: 'Practice parsing and batching time-series sensor data.',
-              whyItMatters:
-                  'Used for real-time carbon sensor tracking in background '
-                  'processes.',
-              whatToLearn:
-                  'Mobile background streams and buffering patterns.',
-              firstStep: "Review the project's `/lib/services/telemetry` docs "
-                  'and open issues tagged #good-first-issue.',
-            ),
-            LearningTip(
-              skill: 'Bluetooth Low Energy (BLE)',
-              tip: 'Connect to a BLE beacon with a sample Flutter app.',
-              whyItMatters:
-                  'Syncing external hardware monitors and wearable telemetry.',
-              whatToLearn: '`flutter_reactive_ble` packet handling.',
-              firstStep:
-                  'Check the sample BLE scanner module in the repository '
-                  'sandbox branch.',
-            ),
-          ],
-          highlights: const [
-            MatchHighlight(
-              title: 'Peer review from Alex Rivera',
-              subtitle: 'Senior Staff Mobile Engineer (Maintainer)',
-            ),
-            MatchHighlight(
-              title: 'Real-world hardware communication',
-              subtitle: 'Debug raw asynchronous byte streams with hardware '
-                  'testing units.',
-            ),
-            MatchHighlight(
-              title: 'High-throughput data handling',
-              subtitle: 'First-hand experience handling 10k+ daily sensor '
-                  'readings smoothly.',
-            ),
-          ],
-          matchedTrack: 'mobile',
-          explanation:
-              'This team is actively building offline caching and sensor '
-              'telemetry sync in Flutter. Your background in mobile apps and '
-              'intermediate Dart makes you an ideal contributor to take '
-              'ownership of the background sync service, while expanding '
-              'your knowledge of environmental telemetry.',
-          source: MatchSource.llm,
-          createdAt: DateTime.now().subtract(const Duration(days: 3)),
+    MatchModel(
+      projectId: 'p1',
+      projectTitle: 'EcoTrack Mobile: Carbon Analytics for IoT arrays',
+      projectDescription: 'Track and reduce your carbon footprint.',
+      purpose: ProjectPurpose.real,
+      score: 92,
+      leadMaintainer: 'Alex Rivera (@rivera-dev)',
+      sprintLabel: 'Sprint Cycle 14',
+      matchedSkills: const [
+        'Flutter',
+        'Dart',
+        'REST APIs',
+        'Git & GitHub Workflows',
+      ],
+      missingSkills: const ['Sensor Telemetry', 'Bluetooth Low Energy (BLE)'],
+      complementarySkills: const [
+        'Riverpod State Management',
+        'Offline Storage',
+        'Async / Await',
+      ],
+      learnPoints: const [
+        'Hardware sensor integration with low-energy Bluetooth (BLE) '
+            'peripheral beacons.',
+        'High-volume timeseries data parsing and query indexing in '
+            'client-side SQLite.',
+        'Collaborative agile workflows and pull request reviews in a '
+            'production open-source codebase.',
+      ],
+      skillDetails: const [
+        SkillDetail(
+          skill: 'Flutter',
+          level: 'Intermediate',
+          note: 'Verified from 14 commits in personal repositories',
         ),
-        MatchModel(
-          projectId: 'p2',
-          projectTitle: 'DevMetrics CLI: Git Telemetry & CI Insights',
-          projectDescription: 'Command line tool for developer metrics.',
-          purpose: ProjectPurpose.learning,
-          score: 86,
-          matchedSkills: const ['Python', 'CLI', 'Git APIs'],
-          missingSkills: const ['CI/CD'],
-          complementarySkills: const ['Dart'],
-          matchedTrack: 'backend',
-          explanation:
-              'Great for Python tooling and hands-on command-line automation.',
-          source: MatchSource.cached,
-          createdAt: DateTime.now().subtract(const Duration(days: 7)),
+        SkillDetail(
+          skill: 'Dart',
+          level: 'Intermediate',
+          note: 'Matched directly to target repository language',
         ),
-        MatchModel(
-          projectId: 'p3',
-          projectTitle: 'NeuroFlow Engine: Mobile Neural On-Device Runtime',
-          projectDescription: 'On-device neural inference runtime.',
-          purpose: ProjectPurpose.real,
-          score: 78,
-          matchedSkills: const ['Python', 'TensorFlow Lite', 'Dart'],
-          missingSkills: const ['Model Quantization'],
-          matchedTrack: 'ai',
-          explanation: 'Good stretch opportunity for TensorFlow Lite '
-              'integration and cross-platform inference.',
-          source: MatchSource.llm,
-          createdAt: DateTime.now().subtract(const Duration(days: 14)),
+        SkillDetail(
+          skill: 'REST APIs',
+          level: 'Architecture',
+          note: 'Experienced with serialization & state sync patterns',
         ),
-      ];
+        SkillDetail(
+          skill: 'Git & GitHub Workflows',
+          level: 'Collaborative',
+          note: 'Track record of clean PR branches and squash merges',
+        ),
+      ],
+      learningTips: const [
+        LearningTip(
+          skill: 'Sensor Telemetry & Time-series Data',
+          tip: 'Practice parsing and batching time-series sensor data.',
+          whyItMatters:
+              'Used for real-time carbon sensor tracking in background '
+              'processes.',
+          whatToLearn: 'Mobile background streams and buffering patterns.',
+          firstStep:
+              "Review the project's `/lib/services/telemetry` docs "
+              'and open issues tagged #good-first-issue.',
+        ),
+        LearningTip(
+          skill: 'Bluetooth Low Energy (BLE)',
+          tip: 'Connect to a BLE beacon with a sample Flutter app.',
+          whyItMatters:
+              'Syncing external hardware monitors and wearable telemetry.',
+          whatToLearn: '`flutter_reactive_ble` packet handling.',
+          firstStep:
+              'Check the sample BLE scanner module in the repository '
+              'sandbox branch.',
+        ),
+      ],
+      highlights: const [
+        MatchHighlight(
+          title: 'Peer review from Alex Rivera',
+          subtitle: 'Senior Staff Mobile Engineer (Maintainer)',
+        ),
+        MatchHighlight(
+          title: 'Real-world hardware communication',
+          subtitle:
+              'Debug raw asynchronous byte streams with hardware '
+              'testing units.',
+        ),
+        MatchHighlight(
+          title: 'High-throughput data handling',
+          subtitle:
+              'First-hand experience handling 10k+ daily sensor '
+              'readings smoothly.',
+        ),
+      ],
+      matchedTrack: 'mobile',
+      explanation:
+          'This team is actively building offline caching and sensor '
+          'telemetry sync in Flutter. Your background in mobile apps and '
+          'intermediate Dart makes you an ideal contributor to take '
+          'ownership of the background sync service, while expanding '
+          'your knowledge of environmental telemetry.',
+      source: MatchSource.llm,
+      createdAt: DateTime.now().subtract(const Duration(days: 3)),
+    ),
+    MatchModel(
+      projectId: 'p2',
+      projectTitle: 'DevMetrics CLI: Git Telemetry & CI Insights',
+      projectDescription: 'Command line tool for developer metrics.',
+      purpose: ProjectPurpose.learning,
+      score: 86,
+      matchedSkills: const ['Python', 'CLI', 'Git APIs'],
+      missingSkills: const ['CI/CD'],
+      complementarySkills: const ['Dart'],
+      matchedTrack: 'backend',
+      explanation:
+          'Great for Python tooling and hands-on command-line automation.',
+      source: MatchSource.cached,
+      createdAt: DateTime.now().subtract(const Duration(days: 7)),
+    ),
+    MatchModel(
+      projectId: 'p3',
+      projectTitle: 'NeuroFlow Engine: Mobile Neural On-Device Runtime',
+      projectDescription: 'On-device neural inference runtime.',
+      purpose: ProjectPurpose.real,
+      score: 78,
+      matchedSkills: const ['Python', 'TensorFlow Lite', 'Dart'],
+      missingSkills: const ['Model Quantization'],
+      matchedTrack: 'ai',
+      explanation:
+          'Good stretch opportunity for TensorFlow Lite '
+          'integration and cross-platform inference.',
+      source: MatchSource.llm,
+      createdAt: DateTime.now().subtract(const Duration(days: 14)),
+    ),
+  ];
 
   @override
   Future<void> submitFeedback(MatchFeedback feedback) async {}

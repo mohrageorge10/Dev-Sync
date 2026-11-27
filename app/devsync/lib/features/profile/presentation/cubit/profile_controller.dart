@@ -20,8 +20,7 @@ class ProfileScope extends InheritedNotifier<ProfileController> {
 
 // State controller for profile setup, editing, GitHub sync, and Firestore persistence.
 class ProfileController extends ChangeNotifier {
-  ProfileController({required ProfileRepository repository})
-    : _repository = repository;
+  ProfileController({required this._repository});
 
   final ProfileRepository _repository;
 
@@ -413,9 +412,8 @@ class ProfileController extends ChangeNotifier {
   }
 
   void toggleDomain(String domain) => _update(
-    () => domains.contains(domain)
-        ? domains.remove(domain)
-        : domains.add(domain),
+    () =>
+        domains.contains(domain) ? domains.remove(domain) : domains.add(domain),
   );
 
   void setBackground(String value) => _update(() => background = value);
@@ -456,15 +454,12 @@ class ProfileController extends ChangeNotifier {
     });
   }
 
-  void setLinks({
-    String? portfolioUrl,
-    String? linkedinUrl,
-    String? github,
-  }) => _update(() {
-    portfolio = portfolioUrl ?? portfolio;
-    linkedin = linkedinUrl ?? linkedin;
-    githubUrl = github ?? githubUrl;
-  });
+  void setLinks({String? portfolioUrl, String? linkedinUrl, String? github}) =>
+      _update(() {
+        portfolio = portfolioUrl ?? portfolio;
+        linkedin = linkedinUrl ?? linkedin;
+        githubUrl = github ?? githubUrl;
+      });
 
   // GitHub flow mutators.
   void setAnalysis(GithubAnalysis result) => _update(() {
@@ -512,10 +507,9 @@ class ProfileController extends ChangeNotifier {
         .toList();
   }
 
-  int get addedCount =>
-      (analysis?.skills ?? [])
-          .where((s) => s.status == SkillStatus.added)
-          .length;
+  int get addedCount => (analysis?.skills ?? [])
+      .where((s) => s.status == SkillStatus.added)
+      .length;
 
   // Removes GitHub analysis data while keeping already verified skills.
   void disconnectGithub() => _update(() {
@@ -557,11 +551,7 @@ class ProfileController extends ChangeNotifier {
 
   // Profile completion checklist.
   List<ChecklistItem> get checklist => [
-    ChecklistItem(
-      'Basic Info',
-      'Bio, title, location & timezone',
-      basicValid,
-    ),
+    ChecklistItem('Basic Info', 'Bio, title, location & timezone', basicValid),
     ChecklistItem(
       'Track & Experience Level',
       track != null && level != null
@@ -583,11 +573,7 @@ class ProfileController extends ChangeNotifier {
           : 'How you collaborate',
       softSkills.isNotEmpty,
     ),
-    ChecklistItem(
-      'CV',
-      resumeName ?? 'Upload your PDF CV',
-      resumeName != null,
-    ),
+    ChecklistItem('CV', resumeName ?? 'Upload your PDF CV', resumeName != null),
     ChecklistItem(
       'Portfolio Link',
       portfolio.trim().isNotEmpty ? portfolio : 'Showcase your best work',

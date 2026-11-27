@@ -272,33 +272,9 @@ class DeveloperModel {
     ];
   }
 
-  // Portfolio projects associated with this developer.
-  List<PortfolioProjectData> portfolioFor(List<ProjectModel> allProjects) {
-    if (projects.isNotEmpty) return projects;
-    final matching = allProjects
-        .where(
-          (p) =>
-              p.tracks.any((t) => t.toLowerCase() == role.toLowerCase()) ||
-              p.tags.any(
-                (t) => skills.any((s) => s.toLowerCase() == t.toLowerCase()),
-              ),
-        )
-        .take(2)
-        .map(
-          (p) => PortfolioProjectData(
-            badgeText: p.type.toUpperCase(),
-            statusText: p.isOpen ? 'Active' : 'Completed',
-            topIcon: p.icon,
-            title: p.title,
-            description: p.description,
-            roleText: '$role Contributor',
-            trailingInfoIcon: Icons.group_outlined,
-            trailingInfoText: '${p.members}/${p.maxMembers} members',
-          ),
-        )
-        .toList();
-    return matching.isNotEmpty ? matching : portfolioProjects;
-  }
+  // Real portfolio projects attached to this developer (no fabricated fallbacks).
+  List<PortfolioProjectData> portfolioFor(List<ProjectModel> allProjects) =>
+      projects;
 
   // Match against active filters.
   bool matches(FilterState f) =>

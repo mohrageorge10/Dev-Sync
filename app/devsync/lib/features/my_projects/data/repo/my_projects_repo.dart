@@ -4,6 +4,7 @@ import 'package:devsync/core/services/firebase/firebase_constants.dart';
 import 'package:devsync/core/services/firebase/firestore_service.dart';
 import 'package:devsync/features/discover_project/data/model/developer_model.dart'
     as discover;
+
 import '../models/applicant_model.dart';
 import '../models/developer_model.dart';
 import '../models/invitation_model.dart';
@@ -45,8 +46,9 @@ class MyProjectsRepo {
               q.where(FirebaseConstants.fieldMemberIds, arrayContains: uid),
         );
         for (final tDoc in teamDocs) {
-          final pid = (tDoc[FirebaseConstants.fieldProjectId] ?? tDoc['id'] ?? '')
-              .toString();
+          final pid =
+              (tDoc[FirebaseConstants.fieldProjectId] ?? tDoc['id'] ?? '')
+                  .toString();
           if (pid.isEmpty || byId.containsKey(pid)) continue;
           final pDoc = await fs.getDocument(
             collectionPath: FirebaseConstants.projectsCollection,
@@ -78,17 +80,20 @@ class MyProjectsRepo {
               collectionPath: FirebaseConstants.usersCollection,
               docId: uid,
             );
-            final name = (userDoc?[FirebaseConstants.fieldName] ??
-                    _auth?.currentUser?.displayName ??
-                    'Developer')
-                .toString();
-            final handle = (userDoc?[FirebaseConstants.fieldPublicId] ??
-                    name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), ''))
-                .toString();
-            final track = (req[FirebaseConstants.fieldTrack] ??
-                    userDoc?[FirebaseConstants.fieldTrack] ??
-                    'Member')
-                .toString();
+            final name =
+                (userDoc?[FirebaseConstants.fieldName] ??
+                        _auth?.currentUser?.displayName ??
+                        'Developer')
+                    .toString();
+            final handle =
+                (userDoc?[FirebaseConstants.fieldPublicId] ??
+                        name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), ''))
+                    .toString();
+            final track =
+                (req[FirebaseConstants.fieldTrack] ??
+                        userDoc?[FirebaseConstants.fieldTrack] ??
+                        'Member')
+                    .toString();
             await fs.setDocument(
               collectionPath:
                   '${FirebaseConstants.teamsCollection}/$pid/${FirebaseConstants.membersCollection}',
@@ -503,11 +508,12 @@ class MyProjectsRepo {
     } catch (_) {}
   }
 
-  // Persist applicant decision, increment filledCount, and add member to teams/{projectId}.
+  // Persist applicant decision, update filledCount & openTrackKeys, and add member to teams/{projectId}.
   Future<void> respondToApplicant(
     ApplicantModel applicant,
     bool accept, {
     int? updatedMembersCount,
+    List<String>? updatedOpenRoles,
   }) async {
     final fs = _firestore;
     if (fs == null) return;
@@ -521,13 +527,14 @@ class MyProjectsRepo {
         },
       );
       if (accept && applicant.projectId.isNotEmpty) {
-        if (updatedMembersCount != null) {
+        if (updatedMembersCount != null || updatedOpenRoles != null) {
           try {
             await fs.updateDocument(
               collectionPath: FirebaseConstants.projectsCollection,
               docId: applicant.projectId,
               data: {
-                FirebaseConstants.fieldFilledCount: updatedMembersCount,
+                FirebaseConstants.fieldFilledCount: ?updatedMembersCount,
+                FirebaseConstants.fieldOpenTrackKeys: ?updatedOpenRoles,
                 FirebaseConstants.fieldUpdatedAt: fs.serverTimestamp,
               },
             );
@@ -727,7 +734,7 @@ class MyProjectsRepo {
     } catch (_) {}
   }
 
-  // Update project lifecycle status (archived or open).
+  // Update project lifecycle status (archived or open) and notify teams/{projectId} listeners.
   Future<void> setProjectArchived(String projectId, bool archived) async {
     final fs = _firestore;
     if (fs == null) return;
@@ -737,8 +744,55 @@ class MyProjectsRepo {
         docId: projectId,
         data: {
           FirebaseConstants.fieldStatus: archived ? 'archived' : 'open',
+          if (archived) 'outcome': ProjectOutcome.archived.firestoreValue,
           FirebaseConstants.fieldUpdatedAt: fs.serverTimestamp,
         },
+      );
+      await fs.setDocument(
+        collectionPath: FirebaseConstants.teamsCollection,
+        docId: projectId,
+        data: {
+          FirebaseConstants.fieldStatus: archived ? 'archived' : 'open',
+          'subtitle': archived ? 'Archived' : 'Active • Real-world',
+          FirebaseConstants.fieldUpdatedAt: fs.serverTimestamp,
+        },
+        merge: true,
+      );
+    } catch (_) {}
+  }
+
+  // Complete or ship a project and sync teams/{projectId} so all members update in real time.
+  Future<void> completeProject(ProjectModel project) async {
+    final fs = _firestore;
+    if (fs == null) return;
+    final outcome = project.outcome ?? ProjectOutcome.completed;
+    try {
+      await fs.setDocument(
+        collectionPath: FirebaseConstants.projectsCollection,
+        docId: project.id,
+        data: {
+          FirebaseConstants.fieldStatus: outcome.firestoreValue,
+          'outcome': outcome.firestoreValue,
+          'productLogoUrl': project.productLogoUrl.trim(),
+          'productUrl': project.productUrl.trim(),
+          'awards': project.awards,
+          'completionSummary': project.completionSummary.trim(),
+          'completedAt': project.completedAt != null
+              ? Timestamp.fromDate(project.completedAt!)
+              : fs.serverTimestamp,
+          FirebaseConstants.fieldUpdatedAt: fs.serverTimestamp,
+        },
+        merge: true,
+      );
+      await fs.setDocument(
+        collectionPath: FirebaseConstants.teamsCollection,
+        docId: project.id,
+        data: {
+          FirebaseConstants.fieldStatus: outcome.firestoreValue,
+          'subtitle': outcome.label,
+          FirebaseConstants.fieldUpdatedAt: fs.serverTimestamp,
+        },
+        merge: true,
       );
     } catch (_) {}
   }
@@ -748,9 +802,14 @@ class MyProjectsRepo {
         .toString()
         .toLowerCase();
     final isDraft = status == 'draft';
-    final isPrevious = status == 'archived' || status == 'completed';
+    final isPrevious =
+        status == 'archived' || status == 'completed' || status == 'shipped';
+    final outcome =
+        ProjectOutcome.fromString(d['outcome']?.toString()) ??
+        (isPrevious ? ProjectOutcome.fromString(status) : null);
     final rawTags = d[FirebaseConstants.fieldTechStack];
     final rawOpen = d[FirebaseConstants.fieldOpenTrackKeys];
+    final rawAwards = d['awards'];
     final repoUrl = (d['repoUrl'] ?? '').toString();
     final cloneUrl = (d['cloneUrl'] ?? ProjectModel.deriveCloneUrl(repoUrl))
         .toString();
@@ -759,7 +818,37 @@ class MyProjectsRepo {
     final rawCode = (d['projectCode'] ?? '').toString().trim();
     final projectCode = rawCode.isNotEmpty
         ? rawCode
-        : (id.length >= 5 ? 'PRJ-${id.substring(0, 5).toUpperCase()}' : 'PRJ-$id');
+        : (id.length >= 5
+              ? 'PRJ-${id.substring(0, 5).toUpperCase()}'
+              : 'PRJ-$id');
+
+    DateTime? completedAt;
+    final rawCompleted = d['completedAt'];
+    if (rawCompleted is Timestamp) {
+      completedAt = rawCompleted.toDate();
+    } else if (rawCompleted is String) {
+      completedAt = DateTime.tryParse(rawCompleted);
+    }
+
+    String period = '';
+    if (completedAt != null) {
+      const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+      period =
+          'Completed ${months[completedAt.month - 1]} ${completedAt.day}, ${completedAt.year}';
+    }
 
     return ProjectModel(
       id: id,
@@ -769,7 +858,7 @@ class MyProjectsRepo {
       statusText: isDraft
           ? 'Draft'
           : isPrevious
-          ? (status == 'completed' ? 'Completed' : 'Archived')
+          ? (outcome?.label ?? 'Completed')
           : 'Active • Open',
       isOwner: d[FirebaseConstants.fieldOwnerId]?.toString() == uid,
       membersCount: (d[FirebaseConstants.fieldFilledCount] is num)
@@ -784,6 +873,7 @@ class MyProjectsRepo {
       openRoles: rawOpen is Iterable
           ? rawOpen.map((e) => e.toString()).toList()
           : const [],
+      period: period,
       type: isDraft
           ? ProjectType.draft
           : isPrevious
@@ -795,6 +885,17 @@ class MyProjectsRepo {
       gitRules: GitWorkflowRules.fromMap(
         rawRules is Map ? Map<String, dynamic>.from(rawRules) : null,
       ),
+      outcome: outcome,
+      productLogoUrl: (d['productLogoUrl'] ?? '').toString(),
+      productUrl: (d['productUrl'] ?? '').toString(),
+      awards: rawAwards is Iterable
+          ? rawAwards
+                .map((e) => e.toString().trim())
+                .where((e) => e.isNotEmpty)
+                .toList()
+          : const [],
+      completionSummary: (d['completionSummary'] ?? '').toString(),
+      completedAt: completedAt,
     );
   }
 
@@ -815,9 +916,10 @@ class MyProjectsRepo {
               .toString(),
       ownerName: (d['ownerName'] ?? 'Project Owner').toString(),
       ownerRole: 'Project Lead',
-      note: (d[FirebaseConstants.fieldMessage] ??
-              'You have been invited to join our team.')
-          .toString(),
+      note:
+          (d[FirebaseConstants.fieldMessage] ??
+                  'You have been invited to join our team.')
+              .toString(),
       role: (d[FirebaseConstants.fieldTrack] ?? 'Contributor').toString(),
       hoursPerWeek: '6-8 hrs / wk',
       level: 'Intermediate',
@@ -846,8 +948,8 @@ class MyProjectsRepo {
     return MyApplicationModel(
       id: (d['id'] ?? '').toString(),
       projectId: (d[FirebaseConstants.fieldProjectId] ?? '').toString(),
-      projectTitle:
-          (d[FirebaseConstants.fieldProjectTitle] ?? 'Project').toString(),
+      projectTitle: (d[FirebaseConstants.fieldProjectTitle] ?? 'Project')
+          .toString(),
       track: (d[FirebaseConstants.fieldTrack] ?? 'Contributor').toString(),
       status: status,
       createdAt: createdAt,
@@ -889,9 +991,10 @@ class MyProjectsRepo {
       photoUrl: snap[FirebaseConstants.fieldPhotoUrl]?.toString(),
       matchPercent: 88,
       position: (d[FirebaseConstants.fieldTrack] ?? 'Contributor').toString(),
-      coverNote: (d[FirebaseConstants.fieldPitch] ??
-              'Excited to contribute to this project!')
-          .toString(),
+      coverNote:
+          (d[FirebaseConstants.fieldPitch] ??
+                  'Excited to contribute to this project!')
+              .toString(),
       skills: skills,
       status: status,
     );
@@ -902,7 +1005,8 @@ class MyProjectsRepo {
     return DeveloperModel(
       id: (d['id'] ?? d[FirebaseConstants.fieldUid] ?? '').toString(),
       name: (d[FirebaseConstants.fieldName] ?? 'Developer').toString(),
-      title: (d[FirebaseConstants.fieldTrack] ?? 'Software Engineer').toString(),
+      title: (d[FirebaseConstants.fieldTrack] ?? 'Software Engineer')
+          .toString(),
       fitPercent: 90,
       skills: rawSkills is Iterable
           ? rawSkills.take(4).map((e) => e.toString()).toList()

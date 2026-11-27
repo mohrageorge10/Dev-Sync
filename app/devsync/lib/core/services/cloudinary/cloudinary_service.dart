@@ -16,7 +16,7 @@ class CloudinaryException implements Exception {
 
 // Client-side unsigned Cloudinary uploader for CVs and avatars.
 class CloudinaryService {
-  CloudinaryService({required Dio dio}) : _dio = dio;
+  CloudinaryService({required this._dio});
 
   final Dio _dio;
 
@@ -52,6 +52,21 @@ class CloudinaryService {
         : '${uid}_avatar_${DateTime.now().millisecondsSinceEpoch}',
   );
 
+  // Upload a completed/shipped project logo image to Cloudinary and return its secure URL.
+  Future<String> uploadProjectLogo({
+    required Uint8List bytes,
+    required String fileName,
+    String? projectId,
+  }) => _upload(
+    bytes: bytes,
+    fileName: fileName,
+    folder: 'project_logos',
+    resourceType: 'image',
+    publicId: projectId == null
+        ? null
+        : '${projectId}_logo_${DateTime.now().millisecondsSinceEpoch}',
+  );
+
   Future<String> _upload({
     required Uint8List bytes,
     required String fileName,
@@ -71,7 +86,7 @@ class CloudinaryService {
     final formData = FormData.fromMap({
       'upload_preset': _uploadPreset,
       'folder': folder,
-      if (publicId != null) 'public_id': publicId,
+      'public_id': ?publicId,
       'file': MultipartFile.fromBytes(bytes, filename: fileName),
     });
 

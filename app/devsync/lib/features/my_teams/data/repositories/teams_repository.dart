@@ -52,7 +52,8 @@ class TeamsRepository {
   }
 
   // Load all teams where the current user is a member, along with members & tasks.
-  Future<({List<Team> teams, List<TaskItem> tasks})> fetchTeamsAndTasks() async {
+  Future<({List<Team> teams, List<TaskItem> tasks})>
+  fetchTeamsAndTasks() async {
     final uid = _auth.currentUserId;
     if (uid == null) return (teams: const <Team>[], tasks: const <TaskItem>[]);
 
@@ -64,10 +65,8 @@ class TeamsRepository {
 
       final teamDocs = await _firestore.getCollection(
         collectionPath: FirebaseConstants.teamsCollection,
-        queryBuilder: (q) => q.where(
-          FirebaseConstants.fieldMemberIds,
-          arrayContains: uid,
-        ),
+        queryBuilder: (q) =>
+            q.where(FirebaseConstants.fieldMemberIds, arrayContains: uid),
       );
       if (teamDocs.isEmpty) {
         return (teams: const <Team>[], tasks: const <TaskItem>[]);
@@ -137,10 +136,11 @@ class TeamsRepository {
         teams.add(
           Team(
             id: teamId,
-            name: (doc[FirebaseConstants.fieldProjectTitle] ??
-                    doc[FirebaseConstants.fieldName] ??
-                    'Team Workspace')
-                .toString(),
+            name:
+                (doc[FirebaseConstants.fieldProjectTitle] ??
+                        doc[FirebaseConstants.fieldName] ??
+                        'Team Workspace')
+                    .toString(),
             subtitle: (doc['subtitle'] ?? 'Active • Real-world').toString(),
             role: myRole.shortLabel,
             sprint: (doc['sprint'] ?? 'Active Sprint').toString(),
@@ -181,9 +181,12 @@ class TeamsRepository {
       for (final p in ownedProjects) {
         final pid = (p['id'] ?? '').toString();
         if (pid.isEmpty) continue;
-        final status =
-            (p[FirebaseConstants.fieldStatus] ?? 'open').toString().toLowerCase();
-        if (status == 'draft' || status == 'completed' || status == 'archived') {
+        final status = (p[FirebaseConstants.fieldStatus] ?? 'open')
+            .toString()
+            .toLowerCase();
+        if (status == 'draft' ||
+            status == 'completed' ||
+            status == 'archived') {
           continue;
         }
 
@@ -192,7 +195,8 @@ class TeamsRepository {
           docId: pid,
         );
         final rawMemberIds = existingTeam?[FirebaseConstants.fieldMemberIds];
-        final hasOwner = rawMemberIds is Iterable &&
+        final hasOwner =
+            rawMemberIds is Iterable &&
             rawMemberIds.map((e) => e.toString()).contains(uid);
         if (existingTeam != null && hasOwner) continue;
 
@@ -203,11 +207,12 @@ class TeamsRepository {
         final ownerName =
             (ownerDoc?[FirebaseConstants.fieldName] ?? currentUserName)
                 .toString();
-        final ownerHandle = (ownerDoc?[FirebaseConstants.fieldPublicId] ??
-                ownerName.toLowerCase().replaceAll(' ', ''))
+        final ownerHandle =
+            (ownerDoc?[FirebaseConstants.fieldPublicId] ??
+                    ownerName.toLowerCase().replaceAll(' ', ''))
+                .toString();
+        final ownerTrack = (ownerDoc?[FirebaseConstants.fieldTrack] ?? 'Owner')
             .toString();
-        final ownerTrack =
-            (ownerDoc?[FirebaseConstants.fieldTrack] ?? 'Owner').toString();
 
         await _firestore.setDocument(
           collectionPath: FirebaseConstants.teamsCollection,
@@ -221,8 +226,8 @@ class TeamsRepository {
             FirebaseConstants.fieldMemberIds: FieldValue.arrayUnion([uid]),
             FirebaseConstants.fieldTeamSize:
                 (p[FirebaseConstants.fieldTeamSize] is num)
-                    ? (p[FirebaseConstants.fieldTeamSize] as num).toInt()
-                    : 4,
+                ? (p[FirebaseConstants.fieldTeamSize] as num).toInt()
+                : 4,
             if (p[FirebaseConstants.fieldOpenTrackKeys] != null)
               FirebaseConstants.fieldOpenTrackKeys:
                   p[FirebaseConstants.fieldOpenTrackKeys],
@@ -269,8 +274,8 @@ class TeamsRepository {
 
       for (final req in accepted) {
         final pid = (req[FirebaseConstants.fieldProjectId] ?? '').toString();
-        final applicantUid =
-            (req[FirebaseConstants.fieldApplicantId] ?? '').toString();
+        final applicantUid = (req[FirebaseConstants.fieldApplicantId] ?? '')
+            .toString();
         if (pid.isEmpty || applicantUid.isEmpty) continue;
 
         final membersPath =
@@ -290,18 +295,21 @@ class TeamsRepository {
             collectionPath: FirebaseConstants.usersCollection,
             docId: applicantUid,
           );
-          final name = (userDoc?[FirebaseConstants.fieldName] ??
-                  snap[FirebaseConstants.fieldName] ??
-                  'Member')
-              .toString();
-          final handle = (userDoc?[FirebaseConstants.fieldPublicId] ??
-                  snap[FirebaseConstants.fieldPublicId] ??
-                  name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), ''))
-              .toString();
-          final track = (req[FirebaseConstants.fieldTrack] ??
-                  userDoc?[FirebaseConstants.fieldTrack] ??
-                  'Member')
-              .toString();
+          final name =
+              (userDoc?[FirebaseConstants.fieldName] ??
+                      snap[FirebaseConstants.fieldName] ??
+                      'Member')
+                  .toString();
+          final handle =
+              (userDoc?[FirebaseConstants.fieldPublicId] ??
+                      snap[FirebaseConstants.fieldPublicId] ??
+                      name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), ''))
+                  .toString();
+          final track =
+              (req[FirebaseConstants.fieldTrack] ??
+                      userDoc?[FirebaseConstants.fieldTrack] ??
+                      'Member')
+                  .toString();
 
           await _firestore.setDocument(
             collectionPath: membersPath,
@@ -330,6 +338,50 @@ class TeamsRepository {
           },
           merge: true,
         );
+
+        // Keep projects/{pid}.filledCount and openTrackKeys in sync with real team members.
+        try {
+          final allMembers = await _firestore.getCollection(
+            collectionPath: membersPath,
+          );
+          final pDoc = await _firestore.getDocument(
+            collectionPath: FirebaseConstants.projectsCollection,
+            docId: pid,
+          );
+          if (pDoc != null) {
+            String norm(String v) =>
+                v.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+            final filledTrack = norm(
+              (req[FirebaseConstants.fieldTrack] ?? '').toString(),
+            );
+            final rawOpen = pDoc[FirebaseConstants.fieldOpenTrackKeys];
+            final openKeys = rawOpen is Iterable
+                ? rawOpen.map((e) => e.toString()).toList()
+                : <String>[];
+            final filteredOpen = filledTrack.isEmpty
+                ? openKeys
+                : openKeys.where((k) => norm(k) != filledTrack).toList();
+            final currentFilled =
+                (pDoc[FirebaseConstants.fieldFilledCount] is num)
+                ? (pDoc[FirebaseConstants.fieldFilledCount] as num).toInt()
+                : 1;
+            if (allMembers.length > currentFilled ||
+                filteredOpen.length != openKeys.length) {
+              await _firestore.updateDocument(
+                collectionPath: FirebaseConstants.projectsCollection,
+                docId: pid,
+                data: {
+                  FirebaseConstants.fieldFilledCount:
+                      allMembers.length > currentFilled
+                      ? allMembers.length
+                      : currentFilled,
+                  FirebaseConstants.fieldOpenTrackKeys: filteredOpen,
+                  FirebaseConstants.fieldUpdatedAt: _firestore.serverTimestamp,
+                },
+              );
+            }
+          }
+        } catch (_) {}
       }
     } catch (_) {}
   }
@@ -340,10 +392,8 @@ class TeamsRepository {
     if (uid == null) return const Stream.empty();
     return _firestore.collectionStream(
       collectionPath: FirebaseConstants.teamsCollection,
-      queryBuilder: (q) => q.where(
-        FirebaseConstants.fieldMemberIds,
-        arrayContains: uid,
-      ),
+      queryBuilder: (q) =>
+          q.where(FirebaseConstants.fieldMemberIds, arrayContains: uid),
     );
   }
 
@@ -447,10 +497,11 @@ class TeamsRepository {
 
     return Team(
       id: teamId,
-      name: (doc[FirebaseConstants.fieldProjectTitle] ??
-              doc[FirebaseConstants.fieldName] ??
-              'Team Workspace')
-          .toString(),
+      name:
+          (doc[FirebaseConstants.fieldProjectTitle] ??
+                  doc[FirebaseConstants.fieldName] ??
+                  'Team Workspace')
+              .toString(),
       subtitle: (doc['subtitle'] ?? 'Active • Real-world').toString(),
       role: myRole.shortLabel,
       sprint: (doc['sprint'] ?? 'Active Sprint').toString(),
@@ -480,8 +531,8 @@ class TeamsRepository {
           'repoUrl': team.repoUrl,
           'sprint': team.sprint,
           'version': team.version,
-          FirebaseConstants.fieldExpectedEndDate:
-              team.expectedEndDate?.toIso8601String(),
+          FirebaseConstants.fieldExpectedEndDate: team.expectedEndDate
+              ?.toIso8601String(),
           'settings': team.settings.toMap(),
           FirebaseConstants.fieldUpdatedAt: _firestore.serverTimestamp,
         },
@@ -498,8 +549,8 @@ class TeamsRepository {
                 ? cleanRepo
                 : '$cleanRepo.git',
           if (team.expectedEndDate != null)
-            FirebaseConstants.fieldExpectedEndDate:
-                team.expectedEndDate!.toIso8601String(),
+            FirebaseConstants.fieldExpectedEndDate: team.expectedEndDate!
+                .toIso8601String(),
           FirebaseConstants.fieldUpdatedAt: _firestore.serverTimestamp,
         },
         merge: true,
@@ -524,11 +575,11 @@ class TeamsRepository {
         data: {
           'teamRole': role.name,
           FirebaseConstants.fieldIsOwner: role == TeamRole.owner,
-          if (alsoTrackLeader != null) 'alsoTrackLeader': alsoTrackLeader,
+          'alsoTrackLeader': ?alsoTrackLeader,
           if (clearLeaderTrack)
             'leaderTrack': null
-          else if (leaderTrack != null)
-            'leaderTrack': leaderTrack,
+          else
+            'leaderTrack': ?leaderTrack,
         },
         merge: true,
       );

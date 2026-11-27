@@ -1,9 +1,15 @@
+import 'package:devsync/core/animations/app_page_route.dart';
+import 'package:devsync/core/di/service_locator.dart';
 import 'package:devsync/core/shared/app_bar/custom_app_bar.dart';
 import 'package:devsync/core/shared/feedback/app_feedback.dart';
 import 'package:devsync/core/shared/headers/header.dart';
 import 'package:devsync/core/shared/sheets/login_required_sheet.dart';
 import 'package:devsync/core/theme/app_colors.dart';
+import 'package:devsync/core/theme/app_styles.dart';
 import 'package:devsync/features/discover_project/data/model/developer_model.dart';
+import 'package:devsync/features/discover_project/data/model/portfolio_data.dart';
+import 'package:devsync/features/discover_project/data/repositories/discover_repository.dart';
+import 'package:devsync/features/discover_project/presentation/screens/public_project_detail_screen.dart';
 import 'package:devsync/features/discover_project/presentation/cubit/discover/discover_cubit.dart';
 import 'package:devsync/features/discover_project/presentation/cubit/discover/discover_cubit_scope.dart';
 import 'package:devsync/features/discover_project/presentation/cubit/discover/discover_state.dart';
@@ -97,8 +103,7 @@ class _ProfileView extends StatelessWidget {
         AppFeedback.show(
           context,
           title: 'Invitation sent',
-          message:
-              'Invited ${developer.name} to join "${project.title}".',
+          message: 'Invited ${developer.name} to join "${project.title}".',
           type: AppFeedbackType.success,
         );
       },
@@ -158,8 +163,7 @@ class _ProfileView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               BlocBuilder<DiscoverCubit, DiscoverState>(
-                buildWhen: (a, b) =>
-                    a.savedDeveloperIds != b.savedDeveloperIds,
+                buildWhen: (a, b) => a.savedDeveloperIds != b.savedDeveloperIds,
                 builder: (context, state) => AvailableHireHeader(
                   isSaved: state.isDeveloperSaved(developer.id),
                   onSharePressed: () => _onShare(context),
@@ -177,25 +181,60 @@ class _ProfileView extends StatelessWidget {
                 text: developer.hasCv ? 'PDF Attached' : 'Not uploaded',
               ),
               PublicCvCard(developer: developer),
-              const Header(
-                title: 'Connected Accounts',
-                text: 'Verified links',
-              ),
+              const Header(title: 'Connected Accounts', text: 'Verified links'),
               SocialLinksSection(items: developer.socialLinks),
-              BlocBuilder<DiscoverCubit, DiscoverState>(
-                buildWhen: (a, b) => a.allProjects != b.allProjects,
-                builder: (context, state) {
-                  final portfolio = developer.portfolioFor(state.allProjects);
+              FutureBuilder<List<PortfolioProjectData>>(
+                future: ServiceLocator.isRegistered<DiscoverRepository>()
+                    ? ServiceLocator.get<DiscoverRepository>()
+                          .fetchDeveloperPublicProjects(developer.id)
+                    : Future.value(const <PortfolioProjectData>[]),
+                builder: (context, snapshot) {
+                  final portfolio = snapshot.data ?? const [];
                   return Column(
                     spacing: 14,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Header(
                         title: 'Public Projects',
-                        text: '${portfolio.length} Active',
+                        text:
+                            snapshot.connectionState == ConnectionState.waiting
+                            ? 'Loading...'
+                            : '${portfolio.length} ${portfolio.length == 1 ? 'Project' : 'Projects'}',
                       ),
-                      for (final p in portfolio)
-                        PortfolioProjectCard(project: p),
+                      if (snapshot.connectionState == ConnectionState.waiting)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: CircularProgressIndicator(),
+                          ),
+                        )
+                      else if (portfolio.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: c.backgroundPrimary,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: c.border),
+                          ),
+                          child: Text(
+                            'No public projects yet',
+                            style: AppStyles.body13Secondary(context),
+                          ),
+                        )
+                      else
+                        for (final p in portfolio)
+                          PortfolioProjectCard(
+                            project: p,
+                            onTap: () => Navigator.of(context).push(
+                              AppPageRoute(
+                                builder: (_) => PublicProjectDetailScreen(
+                                  project: p,
+                                  isGuest: isGuest,
+                                ),
+                              ),
+                            ),
+                          ),
                     ],
                   );
                 },

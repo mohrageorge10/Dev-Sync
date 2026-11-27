@@ -4,7 +4,9 @@ import 'package:devsync/core/services/firebase/firestore_service.dart';
 import 'package:devsync/core/utils/devsync_enums.dart';
 import 'package:devsync/features/create_project/data/model/enums.dart';
 import 'package:devsync/features/discover_project/data/model/developer_model.dart';
+import 'package:devsync/features/discover_project/data/model/portfolio_data.dart';
 import 'package:devsync/features/discover_project/data/model/project_model.dart';
+import 'package:flutter/material.dart';
 
 // Unified repository for discovering projects, developers, bookmarks, applications, and invites.
 class DiscoverRepository {
@@ -118,16 +120,23 @@ class DiscoverRepository {
   // Current authenticated user ID.
   String? get currentUserId => _auth.currentUserId;
 
-  // Fetch non-draft projects from Firestore (real data only).
+  bool _isDiscoverableProject(Map<String, dynamic> d) {
+    final status =
+        (d[FirebaseConstants.fieldStatus] ?? 'open').toString().toLowerCase();
+    return status != ProjectStatus.draft.name &&
+        status != 'completed' &&
+        status != 'shipped' &&
+        status != 'archived';
+  }
+
+  // Fetch active discoverable projects from Firestore (excludes draft/completed/shipped/archived).
   Future<List<ProjectModel>> fetchProjects() async {
     try {
       final docs = await _firestore.getCollection(
         collectionPath: FirebaseConstants.projectsCollection,
       );
       return docs
-          .where(
-            (d) => d[FirebaseConstants.fieldStatus] != ProjectStatus.draft.name,
-          )
+          .where(_isDiscoverableProject)
           .map(ProjectModel.fromFirestore)
           .toList();
     } catch (_) {
@@ -151,20 +160,217 @@ class DiscoverRepository {
     }
   }
 
-  // Real-time stream of non-draft projects in Firestore.
+  // Real-time stream of active discoverable projects in Firestore.
   Stream<List<ProjectModel>> watchProjects() {
     return _firestore
         .collectionStream(collectionPath: FirebaseConstants.projectsCollection)
         .map(
           (docs) => docs
-              .where(
-                (d) =>
-                    d[FirebaseConstants.fieldStatus] !=
-                    ProjectStatus.draft.name,
-              )
+              .where(_isDiscoverableProject)
               .map(ProjectModel.fromFirestore)
               .toList(),
         );
+  }
+
+  // Fetch real public projects (owned or joined, including completed/shipped with logos & awards).
+  Future<List<PortfolioProjectData>> fetchDeveloperPublicProjects(
+    String developerId,
+  ) async {
+    if (developerId.isEmpty) return const [];
+    try {
+      final byId = <String, ({Map<String, dynamic> doc, bool isOwner})>{};
+
+      final ownedDocs = await _firestore.getCollection(
+        collectionPath: FirebaseConstants.projectsCollection,
+        queryBuilder: (q) =>
+            q.where(FirebaseConstants.fieldOwnerId, isEqualTo: developerId),
+      );
+      for (final d in ownedDocs) {
+        final id = (d['id'] ?? '').toString();
+        final status =
+            (d[FirebaseConstants.fieldStatus] ?? 'open').toString().toLowerCase();
+        if (id.isEmpty || status == 'draft') continue;
+        byId[id] = (doc: d, isOwner: true);
+      }
+
+      final teamDocs = await _firestore.getCollection(
+        collectionPath: FirebaseConstants.teamsCollection,
+        queryBuilder: (q) => q.where(
+          FirebaseConstants.fieldMemberIds,
+          arrayContains: developerId,
+        ),
+      );
+      for (final t in teamDocs) {
+        final pid =
+            (t[FirebaseConstants.fieldProjectId] ?? t['id'] ?? '').toString();
+        if (pid.isEmpty || byId.containsKey(pid)) continue;
+        final pDoc = await _firestore.getDocument(
+          collectionPath: FirebaseConstants.projectsCollection,
+          docId: pid,
+        );
+        if (pDoc == null) continue;
+        final status = (pDoc[FirebaseConstants.fieldStatus] ?? 'open')
+            .toString()
+            .toLowerCase();
+        if (status == 'draft') continue;
+        byId[pid] = (doc: {...pDoc, 'id': pid}, isOwner: false);
+      }
+
+      return byId.values.map((entry) {
+        final d = entry.doc;
+        final status =
+            (d[FirebaseConstants.fieldStatus] ?? 'open').toString().toLowerCase();
+        final outcome = (d['outcome'] ?? status).toString().toLowerCase();
+        final isCompleted =
+            status == 'completed' || status == 'shipped' || status == 'archived';
+        final statusLabel = switch (outcome) {
+          'shipped' => 'Shipped Product',
+          'completed' => 'Completed',
+          'archived' => 'Archived',
+          _ => 'Active',
+        };
+        final rawType = (d[FirebaseConstants.fieldType] ?? 'REAL-WORLD')
+            .toString()
+            .toUpperCase();
+        final filled = (d[FirebaseConstants.fieldFilledCount] is num)
+            ? (d[FirebaseConstants.fieldFilledCount] as num).toInt()
+            : 1;
+        final rawAwards = d['awards'];
+        final awards = rawAwards is Iterable
+            ? rawAwards
+                  .map((e) => e.toString().trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList()
+            : const <String>[];
+        final rawTags = d[FirebaseConstants.fieldTechStack];
+        final tags = rawTags is Iterable
+            ? rawTags
+                  .map((e) => e.toString().trim())
+                  .where((e) => e.isNotEmpty)
+                  .toList()
+            : const <String>[];
+        final summary = (d['completionSummary'] ?? '').toString().trim();
+        final fullDesc =
+            (d[FirebaseConstants.fieldDescription] ?? '').toString().trim();
+        final desc = summary.isNotEmpty ? summary : fullDesc;
+
+        String period = '';
+        final rawCompleted = d['completedAt'];
+        DateTime? completedAt;
+        if (rawCompleted is DateTime) {
+          completedAt = rawCompleted;
+        } else if (rawCompleted != null) {
+          try {
+            completedAt = (rawCompleted as dynamic).toDate() as DateTime?;
+          } catch (_) {
+            completedAt = DateTime.tryParse(rawCompleted.toString());
+          }
+        }
+        if (completedAt != null) {
+          const months = [
+            'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+          ];
+          period =
+              'Completed ${months[completedAt.month - 1]} ${completedAt.day}, ${completedAt.year}';
+        }
+
+        return PortfolioProjectData(
+          projectId: (d['id'] ?? '').toString(),
+          badgeText: rawType,
+          statusText: statusLabel,
+          topIcon: isCompleted
+              ? Icons.rocket_launch_outlined
+              : Icons.workspaces_outline,
+          title: (d[FirebaseConstants.fieldTitle] ?? 'Project').toString(),
+          description: fullDesc.isNotEmpty ? fullDesc : desc,
+          completionSummary: summary,
+          roleText: entry.isOwner ? 'Project Owner' : 'Team Member',
+          trailingInfoIcon: Icons.group_outlined,
+          trailingInfoText: '$filled ${filled == 1 ? 'member' : 'members'}',
+          logoUrl: (d['productLogoUrl'] ?? '').toString().trim(),
+          productUrl: (d['productUrl'] ?? '').toString().trim(),
+          repoUrl: (d['repoUrl'] ?? '').toString().trim(),
+          period: period,
+          tags: tags,
+          awards: awards,
+          isCompleted: isCompleted,
+        );
+      }).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  // Fetch all team members who worked on a project (Owner pinned first).
+  Future<List<({DeveloperModel developer, String teamRole, String track})>>
+  fetchProjectContributors(String projectId) async {
+    if (projectId.isEmpty) return const [];
+    try {
+      final memberDocs = await _firestore.getCollection(
+        collectionPath:
+            '${FirebaseConstants.teamsCollection}/$projectId/${FirebaseConstants.membersCollection}',
+      );
+      final contributors =
+          <({DeveloperModel developer, String teamRole, String track, int rank})>[];
+
+      for (final m in memberDocs) {
+        final uid = (m[FirebaseConstants.fieldUid] ?? m['id'] ?? '').toString();
+        if (uid.isEmpty) continue;
+        final rawRole = (m['teamRole'] ?? '').toString().toLowerCase();
+        final isOwner = rawRole == 'owner' || m[FirebaseConstants.fieldIsOwner] == true;
+        final isLeader = rawRole == 'trackleader' || rawRole == 'track_leader';
+        final roleLabel = isOwner
+            ? 'Owner'
+            : isLeader
+            ? 'Track Leader'
+            : 'Member';
+        final track = (m[FirebaseConstants.fieldTrack] ?? '').toString().trim();
+
+        final userDoc = await _firestore.getDocument(
+          collectionPath: FirebaseConstants.usersCollection,
+          docId: uid,
+        );
+        final dev = userDoc != null
+            ? DeveloperModel.fromFirestore({...userDoc, 'id': uid})
+            : DeveloperModel(
+                id: uid,
+                name: (m[FirebaseConstants.fieldName] ?? 'Developer').toString(),
+                publicId: m['username']?.toString(),
+                role: track.isNotEmpty ? track : 'Contributor',
+                level: 'Intermediate',
+                skills: const [],
+                bio: '',
+              );
+
+        contributors.add((
+          developer: dev,
+          teamRole: roleLabel,
+          track: track.isNotEmpty ? track : dev.role,
+          rank: isOwner ? 0 : (isLeader ? 1 : 2),
+        ));
+      }
+
+      contributors.sort((a, b) {
+        final cmp = a.rank.compareTo(b.rank);
+        if (cmp != 0) return cmp;
+        return a.developer.name
+            .toLowerCase()
+            .compareTo(b.developer.name.toLowerCase());
+      });
+
+      return contributors
+          .map(
+            (e) => (
+              developer: e.developer,
+              teamRole: e.teamRole,
+              track: e.track,
+            ),
+          )
+          .toList();
+    } catch (_) {
+      return const [];
+    }
   }
 
   // Real-time stream of discoverable developers (including live online presence).

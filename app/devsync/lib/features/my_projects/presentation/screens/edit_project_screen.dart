@@ -4,6 +4,7 @@ import 'package:devsync/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../../data/models/project_model.dart';
 import '../cubit/my_projects_cubit.dart';
 import '../widgets/app_button.dart';
@@ -136,8 +137,9 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
     final filled = widget.project.membersCount < 1
         ? 1
         : widget.project.membersCount;
-    final availableTracks =
-        _tracks.where((t) => !_trackCounts.containsKey(t)).toList();
+    final availableTracks = _tracks
+        .where((t) => !_trackCounts.containsKey(t))
+        .toList();
 
     return Scaffold(
       backgroundColor: c.surface,
@@ -165,7 +167,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                     trailingLabel: 'Required',
                     hint: 'Enter project name',
                     inputFormatters: [LengthLimitingTextInputFormatter(80)],
-                    validator: (v) => (v == null || v.trim().length < 3)
+                    validator: (v) => (v.trim().length < 3)
                         ? 'Title must be at least 3 characters'
                         : null,
                   ),
@@ -177,7 +179,7 @@ class _EditProjectScreenState extends State<EditProjectScreen> {
                     hint: 'Describe your project goals and scope...',
                     maxLines: 4,
                     inputFormatters: [LengthLimitingTextInputFormatter(300)],
-                    validator: (v) => (v == null || v.trim().length < 10)
+                    validator: (v) => (v.trim().length < 10)
                         ? 'Description must be at least 10 characters'
                         : null,
                   ),
