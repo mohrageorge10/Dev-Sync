@@ -40,6 +40,7 @@ import 'package:devsync/features/my_teams/presentation/screens/team_settings_scr
 import 'package:devsync/features/my_teams/presentation/screens/team_workspace_screen.dart';
 import 'package:devsync/features/profile/presentation/cubit/profile_controller.dart';
 import 'package:devsync/features/profile/presentation/screens/basic_info_screen.dart';
+import 'package:devsync/features/profile/presentation/screens/behance/connect_behance_screen.dart';
 import 'package:devsync/features/profile/presentation/screens/complete_profile_screen.dart';
 import 'package:devsync/features/profile/presentation/screens/connect_work_screen.dart';
 import 'package:devsync/features/profile/presentation/screens/cv_viewer_screen.dart';
@@ -261,6 +262,9 @@ class AppRouter {
 
       case AppRoutes.profileGithubReview:
         return _profileRoute(const ReviewSkillsScreen(), settings);
+
+      case AppRoutes.profileBehanceConnect:
+        return _profileRoute(const ConnectBehanceScreen(), settings);
 
       case AppRoutes.profileCvViewer:
         final args = settings.arguments;
