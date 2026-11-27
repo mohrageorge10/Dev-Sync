@@ -1,6 +1,28 @@
 // Project lifecycle state: active (ongoing), saved draft, or completed/archived (previous).
 enum ProjectType { ongoing, draft, previous }
 
+// Completion outcome when a project moves to Previous.
+enum ProjectOutcome {
+  completed,
+  shipped,
+  archived;
+
+  String get label => switch (this) {
+        ProjectOutcome.completed => 'Completed',
+        ProjectOutcome.shipped => 'Shipped Product',
+        ProjectOutcome.archived => 'Archived',
+      };
+
+  String get firestoreValue => name;
+
+  static ProjectOutcome? fromString(String? value) => switch (value?.toLowerCase()) {
+        'completed' || 'delivered' => ProjectOutcome.completed,
+        'shipped' => ProjectOutcome.shipped,
+        'archived' => ProjectOutcome.archived,
+        _ => null,
+      };
+}
+
 // Structured Git & collaboration rules for a project repository.
 class GitWorkflowRules {
   const GitWorkflowRules({
@@ -88,6 +110,12 @@ class ProjectModel {
     this.defaultBranch = 'develop',
     this.projectCode = '',
     this.gitRules = const GitWorkflowRules(),
+    this.outcome,
+    this.productLogoUrl = '',
+    this.productUrl = '',
+    this.awards = const [],
+    this.completionSummary = '',
+    this.completedAt,
   });
 
   final String id;
@@ -100,12 +128,24 @@ class ProjectModel {
   int totalSeats;
   List<String> tags;
   List<String> openRoles;
-  final String period;
+  String period;
   ProjectType type;
   String repoUrl;
   String cloneUrl;
   String defaultBranch;
   GitWorkflowRules gitRules;
+  ProjectOutcome? outcome;
+  String productLogoUrl;
+  String productUrl;
+  List<String> awards;
+  String completionSummary;
+  DateTime? completedAt;
+
+  bool get hasShowcase =>
+      productLogoUrl.trim().isNotEmpty ||
+      productUrl.trim().isNotEmpty ||
+      awards.isNotEmpty ||
+      completionSummary.trim().isNotEmpty;
 
   // Derived git clone command for 1-tap clipboard copy.
   String get cloneCommand {

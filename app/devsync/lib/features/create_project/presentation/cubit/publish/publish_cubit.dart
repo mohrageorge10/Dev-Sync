@@ -12,13 +12,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 // Handles saving draft, publishing project, and syncing dependent app controllers.
 class PublishCubit extends Cubit<PublishState> {
   PublishCubit({
-    required ProjectRepository repository,
+    required this._repository,
     required DraftCubit draftCubit,
-    required TeamCubit teamCubit,
-  })  : _repository = repository,
-        _draftCubit = draftCubit,
-        _teamCubit = teamCubit,
-        super(const PublishInitial());
+    required this._teamCubit,
+  }) : _draftCubit = draftCubit,
+       super(const PublishInitial());
 
   final ProjectRepository _repository;
   final DraftCubit _draftCubit;

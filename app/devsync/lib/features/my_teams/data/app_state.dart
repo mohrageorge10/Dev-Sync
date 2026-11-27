@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 
 // Central state controller for My Teams, Task Board, Role-Based Permissions, and real-time Firestore sync.
 class TeamsController extends ChangeNotifier {
-  TeamsController({TeamsRepository? repository}) : _repository = repository {
+  TeamsController({this._repository}) {
     me = const Member(
       id: 'guest',
       name: 'Developer',
@@ -173,67 +173,59 @@ class TeamsController extends ChangeNotifier {
 
     _cancelStreams();
 
-    _onlineSub = repo.watchOnlineUserIds().listen(
-      (ids) {
-        Timer.run(() {
-          _onlineUserIds = ids;
-          notifyListeners();
-        });
-      },
-      onError: (_) {},
-    );
+    _onlineSub = repo.watchOnlineUserIds().listen((ids) {
+      Timer.run(() {
+        _onlineUserIds = ids;
+        notifyListeners();
+      });
+    }, onError: (_) {});
 
-    _teamsSub = repo.watchTeamDocs().listen(
-      (docs) {
-        Timer.run(() {
-          final activeIds = <String>{};
-          for (final doc in docs) {
-            final teamId = (doc['id'] ?? '').toString();
-            if (teamId.isEmpty) continue;
-            activeIds.add(teamId);
-            _rawTeamDocs[teamId] = doc;
+    _teamsSub = repo.watchTeamDocs().listen((docs) {
+      Timer.run(() {
+        final activeIds = <String>{};
+        for (final doc in docs) {
+          final teamId = (doc['id'] ?? '').toString();
+          if (teamId.isEmpty) continue;
+          activeIds.add(teamId);
+          _rawTeamDocs[teamId] = doc;
 
-            if (!_memberSubs.containsKey(teamId)) {
-              _memberSubs[teamId] = repo.watchTeamMembers(teamId).listen(
-                (members) {
-                  Timer.run(() {
-                    _liveMembers[teamId] = members;
-                    _rebuildFromStreams(uid);
-                  });
-                },
-                onError: (_) {},
-              );
-            }
-            if (!_taskSubs.containsKey(teamId)) {
-              _taskSubs[teamId] = repo.watchTeamTaskDocs(teamId).listen(
-                (taskDocs) {
-                  Timer.run(() {
-                    _rawTaskDocs[teamId] = taskDocs;
-                    _rebuildFromStreams(uid);
-                  });
-                },
-                onError: (_) {},
-              );
-            }
+          if (!_memberSubs.containsKey(teamId)) {
+            _memberSubs[teamId] = repo.watchTeamMembers(teamId).listen((
+              members,
+            ) {
+              Timer.run(() {
+                _liveMembers[teamId] = members;
+                _rebuildFromStreams(uid);
+              });
+            }, onError: (_) {});
           }
-
-          // Clean up subscriptions for teams the user left or that were deleted.
-          final staleIds = _memberSubs.keys
-              .where((id) => !activeIds.contains(id))
-              .toList();
-          for (final stale in staleIds) {
-            _memberSubs.remove(stale)?.cancel();
-            _taskSubs.remove(stale)?.cancel();
-            _rawTeamDocs.remove(stale);
-            _liveMembers.remove(stale);
-            _rawTaskDocs.remove(stale);
+          if (!_taskSubs.containsKey(teamId)) {
+            _taskSubs[teamId] = repo.watchTeamTaskDocs(teamId).listen((
+              taskDocs,
+            ) {
+              Timer.run(() {
+                _rawTaskDocs[teamId] = taskDocs;
+                _rebuildFromStreams(uid);
+              });
+            }, onError: (_) {});
           }
+        }
 
-          _rebuildFromStreams(uid);
-        });
-      },
-      onError: (_) {},
-    );
+        // Clean up subscriptions for teams the user left or that were deleted.
+        final staleIds = _memberSubs.keys
+            .where((id) => !activeIds.contains(id))
+            .toList();
+        for (final stale in staleIds) {
+          _memberSubs.remove(stale)?.cancel();
+          _taskSubs.remove(stale)?.cancel();
+          _rawTeamDocs.remove(stale);
+          _liveMembers.remove(stale);
+          _rawTaskDocs.remove(stale);
+        }
+
+        _rebuildFromStreams(uid);
+      });
+    }, onError: (_) {});
   }
 
   void _rebuildFromStreams(String uid) {
@@ -246,7 +238,8 @@ class TeamsController extends ChangeNotifier {
     for (final entry in _rawTeamDocs.entries) {
       final teamId = entry.key;
       final existing = findTeamById(teamId);
-      final members = _liveMembers[teamId] ?? existing?.members ?? const <Member>[];
+      final members =
+          _liveMembers[teamId] ?? existing?.members ?? const <Member>[];
       nextTeams.add(repo.teamFromDoc(entry.value, members: members, uid: uid));
 
       final taskDocs = _rawTaskDocs[teamId];
@@ -429,7 +422,9 @@ class TeamsController extends ChangeNotifier {
     final idx = _teams.indexWhere((t) => t.id == teamId);
     if (idx == -1) return;
     final team = _teams[idx];
-    final cleanTrack = role == TeamRole.trackLeader ? leaderTrack?.trim() : null;
+    final cleanTrack = role == TeamRole.trackLeader
+        ? leaderTrack?.trim()
+        : null;
     final clearTrack = role == TeamRole.member;
     final updatedMembers = [
       for (final m in team.members)

@@ -69,8 +69,9 @@ class MatchCard extends StatelessWidget {
                   const SizedBox(width: 8),
                 ],
                 Expanded(
-                    child: Text(title!, style: AppStyles.title15Bold(context))),
-                if (trailing != null) trailing!,
+                  child: Text(title!, style: AppStyles.title15Bold(context)),
+                ),
+                ?trailing,
               ],
             ),
             const SizedBox(height: 12),

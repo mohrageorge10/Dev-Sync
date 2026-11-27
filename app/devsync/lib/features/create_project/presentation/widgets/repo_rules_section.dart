@@ -1,7 +1,6 @@
 import 'package:devsync/core/shared/input_fields/app_input_field.dart';
 import 'package:devsync/core/theme/app_colors.dart';
 import 'package:devsync/core/theme/app_styles.dart';
-import 'package:devsync/features/create_project/data/model/project_draft.dart';
 import 'package:devsync/features/create_project/presentation/cubit/draft/draft_cubit.dart';
 import 'package:devsync/features/create_project/presentation/widgets/soft_card.dart';
 import 'package:flutter/material.dart';

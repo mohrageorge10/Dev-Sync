@@ -11,12 +11,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 // Developer search, track filter, and multi-select cubit.
 class BuilderSearchCubit extends Cubit<BuilderSearchState> {
-  BuilderSearchCubit({
-    required BuildersRepository repository,
-    required TeamCubit teamCubit,
-  })  : _repository = repository,
-        _teamCubit = teamCubit,
-        super(const BuilderSearchState());
+  BuilderSearchCubit({required this._repository, required TeamCubit teamCubit})
+    : _teamCubit = teamCubit,
+      super(const BuilderSearchState());
 
   final BuildersRepository _repository;
   final TeamCubit _teamCubit;
@@ -56,10 +53,13 @@ class BuilderSearchCubit extends Cubit<BuilderSearchState> {
     final openSlots = _lockedTrackId == null
         ? team.tracks.where((t) => t.openSpots > 0).toList()
         : team.tracks
-            .where((t) => t.definition.id == _lockedTrackId && t.openSpots > 0)
-            .toList();
-    final invited =
-        team.tracks.expand((t) => t.invites.map((i) => i.builder.id)).toSet();
+              .where(
+                (t) => t.definition.id == _lockedTrackId && t.openSpots > 0,
+              )
+              .toList();
+    final invited = team.tracks
+        .expand((t) => t.invites.map((i) => i.builder.id))
+        .toSet();
 
     final scored = <ScoredBuilder>[];
     for (final b in found) {

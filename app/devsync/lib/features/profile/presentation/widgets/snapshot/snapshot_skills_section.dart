@@ -113,7 +113,10 @@ class SnapshotSkillsSection extends StatelessWidget {
               Icon(Icons.code_rounded, size: 17, color: c.primary),
               const SizedBox(width: 8),
               Expanded(
-                child: Text('Your Skills', style: AppStyles.body14Bold(context)),
+                child: Text(
+                  'Your Skills',
+                  style: AppStyles.body14Bold(context),
+                ),
               ),
               if (isVerified)
                 Container(
@@ -240,10 +243,9 @@ class _SkillPill extends StatelessWidget {
     required this.backgroundColor,
     required this.borderColor,
     required this.textColor,
-    this.sublabel,
     this.icon,
     this.bold = false,
-  });
+  }) : sublabel = null;
 
   final String label;
   final String? sublabel;

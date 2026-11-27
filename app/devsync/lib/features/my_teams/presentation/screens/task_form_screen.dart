@@ -8,6 +8,7 @@ import 'package:devsync/core/theme/app_styles.dart';
 import 'package:devsync/core/utils/date_format_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../../data/app_state.dart';
 import '../../data/models/models.dart';
 import '../widgets/common.dart';
@@ -254,9 +255,8 @@ class _TaskFormScreenState extends State<TaskFormScreen> {
                     label: 'Task Title',
                     trailingLabel: 'Required',
                     hint: 'What needs to be done?',
-                    validator: (v) => (v == null || v.trim().isEmpty)
-                        ? 'Title is required'
-                        : null,
+                    validator: (v) =>
+                        (v.trim().isEmpty) ? 'Title is required' : null,
                   ),
                   const SizedBox(height: 14),
                   AppInputField(

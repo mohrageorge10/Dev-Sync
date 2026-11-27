@@ -338,6 +338,7 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
         : ApplicantStatus.declined;
 
     int? updatedCount;
+    List<String>? updatedOpenRoles;
     if (accept && applicant.projectId.isNotEmpty) {
       final project = s.projects
           .where((p) => p.id == applicant.projectId)
@@ -350,14 +351,17 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
           project.totalSeats = project.membersCount;
         }
         updatedCount = project.membersCount;
+        String norm(String v) =>
+            v.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+        final targetKey = norm(applicant.position);
         final roleIdx = project.openRoles.indexWhere(
-          (r) =>
-              r.trim().toLowerCase() == applicant.position.trim().toLowerCase(),
+          (r) => norm(r) == targetKey,
         );
         if (roleIdx != -1) {
           project.openRoles = List<String>.from(project.openRoles)
             ..removeAt(roleIdx);
         }
+        updatedOpenRoles = project.openRoles;
       }
       final memberUid = applicant.applicantUid.isNotEmpty
           ? applicant.applicantUid
@@ -392,6 +396,7 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
       applicant,
       accept,
       updatedMembersCount: updatedCount,
+      updatedOpenRoles: updatedOpenRoles,
     );
   }
 
@@ -427,6 +432,7 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
     final project = s.projects.where((p) => p.id == id).firstOrNull;
     if (project == null || !project.isOwner) return;
     project.type = ProjectType.ongoing;
+    project.outcome = null;
     project.statusText = 'Active • Open';
 
     emit(_copy(s, message: '"${project.name}" published to Ongoing'));
@@ -453,6 +459,53 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
     await repo.deleteProject(id);
   }
 
+  // Complete or ship a project with optional product logo, live URL, awards, and summary.
+  Future<void> completeProject(
+    String id, {
+    required ProjectOutcome outcome,
+    String productLogoUrl = '',
+    String productUrl = '',
+    List<String> awards = const [],
+    String completionSummary = '',
+  }) async {
+    final s = state;
+    if (s is! MyProjectsLoaded) return;
+
+    final project = s.projects.where((p) => p.id == id).firstOrNull;
+    if (project == null || !project.isOwner) return;
+
+    final wasPrevious = project.type == ProjectType.previous;
+    project.type = ProjectType.previous;
+    project.outcome = outcome;
+    project.statusText = outcome.label;
+    project.productLogoUrl = productLogoUrl.trim();
+    project.productUrl = productUrl.trim();
+    project.awards = awards
+        .map((a) => a.trim())
+        .where((a) => a.isNotEmpty)
+        .toList();
+    project.completionSummary = completionSummary.trim();
+    project.completedAt ??= DateTime.now();
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    final dt = project.completedAt!;
+    project.period = 'Completed ${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+
+    emit(
+      _copy(
+        s,
+        message: wasPrevious
+            ? 'Product showcase updated'
+            : outcome == ProjectOutcome.shipped
+            ? 'Project marked as Shipped Product'
+            : 'Project marked as ${outcome.label}',
+      ),
+    );
+    await repo.completeProject(project);
+  }
+
   // Archive an active owned project.
   Future<void> archiveProject(String id) async {
     final s = state;
@@ -461,6 +514,7 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
     final project = s.projects.where((p) => p.id == id).firstOrNull;
     if (project == null) return;
     project.type = ProjectType.previous;
+    project.outcome = ProjectOutcome.archived;
     project.statusText = 'Archived';
 
     emit(_copy(s, message: 'Project archived'));
@@ -475,6 +529,7 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
     final project = s.projects.where((p) => p.id == id).firstOrNull;
     if (project == null || !project.isOwner) return;
     project.type = ProjectType.ongoing;
+    project.outcome = null;
     project.statusText = 'Active • Open';
 
     emit(_copy(s, message: 'Project restored to Ongoing'));

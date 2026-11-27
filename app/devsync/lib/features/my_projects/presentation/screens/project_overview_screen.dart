@@ -14,10 +14,12 @@ import '../../data/models/project_model.dart';
 import '../cubit/my_projects_cubit.dart';
 import '../widgets/app_button.dart';
 import '../widgets/project_overview_screen/candidate_pipeline_card.dart';
+import '../widgets/project_overview_screen/product_showcase_card.dart';
 import '../widgets/project_overview_screen/project_header_card.dart';
 import '../widgets/project_overview_screen/project_repo_rules_card.dart';
 import '../widgets/project_overview_screen/team_info_card.dart';
 import '../widgets/user_avatar.dart';
+import 'complete_project_screen.dart';
 import 'edit_project_screen.dart';
 import 'edit_repo_rules_screen.dart';
 import 'incoming_requests_screen.dart';
@@ -213,6 +215,15 @@ class ProjectOverviewScreen extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             children: [
               ProjectHeaderCard(project: current),
+              if (current.type == ProjectType.previous || current.hasShowcase)
+                ProductShowcaseCard(
+                  project: current,
+                  canEdit: current.isOwner,
+                  onEdit: () => _pushWithCubit(
+                    context,
+                    CompleteProjectScreen(project: current),
+                  ),
+                ),
               ProjectRepoRulesCard(
                 project: current,
                 canEdit: canEditProject,
@@ -247,6 +258,26 @@ class ProjectOverviewScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 AppButton(
+                  label: 'Complete & Deliver Project',
+                  outlined: true,
+                  color: c.success,
+                  onPressed: () async {
+                    final cubit = context.read<MyProjectsCubit>();
+                    final completed = await Navigator.of(context).push<bool>(
+                      AppPageRoute(
+                        builder: (_) => BlocProvider.value(
+                          value: cubit,
+                          child: CompleteProjectScreen(project: current),
+                        ),
+                      ),
+                    );
+                    if (completed == true && context.mounted) {
+                      Navigator.of(context).pop();
+                    }
+                  },
+                ),
+                const SizedBox(height: 8),
+                AppButton(
                   label: 'Archive Project',
                   outlined: true,
                   color: c.error,
@@ -267,6 +298,8 @@ class ProjectOverviewScreen extends StatelessWidget {
                 const SizedBox(height: 4),
                 AppButton(
                   label: 'Restore Project',
+                  outlined: true,
+                  color: c.primary,
                   onPressed: () {
                     context.read<MyProjectsCubit>().restoreProject(current.id);
                     Navigator.pop(context);

@@ -78,7 +78,7 @@ class _TrackLeaderPickerDialogState extends State<_TrackLeaderPickerDialog> {
     final c = context.colors;
     final preview = _resolvedTrack.isEmpty
         ? 'Track Leader'
-        : '${_resolvedTrack} Leader';
+        : '$_resolvedTrack Leader';
 
     return AlertDialog(
       backgroundColor: c.backgroundPrimary,

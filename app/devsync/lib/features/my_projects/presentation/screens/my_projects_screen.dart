@@ -18,7 +18,7 @@ import '../widgets/my_projects_screen/drafted_project_card.dart';
 import '../widgets/my_projects_screen/empty_view.dart';
 import '../widgets/my_projects_screen/invited_project_card.dart';
 import '../widgets/my_projects_screen/ongoing_tab_view.dart';
-import '../widgets/my_projects_screen/previous_project_card.dart';
+import '../widgets/my_projects_screen/previous_tab_view.dart';
 import 'invitation_details_screen.dart';
 import 'project_overview_screen.dart';
 
@@ -270,36 +270,13 @@ class MyProjectsScreen extends StatelessWidget {
                                     .toList(),
                               ),
                       ),
-                      RefreshIndicator(
+                      PreviousTabView(
+                        projects: data.previous,
                         onRefresh: cubit.loadData,
-                        child: data.previous.isEmpty
-                            ? ListView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                children: const [
-                                  SizedBox(height: 120),
-                                  EmptyView('No previous projects'),
-                                ],
-                              )
-                            : ListView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                padding: const EdgeInsets.fromLTRB(
-                                  16,
-                                  16,
-                                  16,
-                                  96,
-                                ),
-                                children: data.previous
-                                    .map(
-                                      (p) => PreviousProjectCard(
-                                        project: p,
-                                        onView: () => _pushWithCubit(
-                                          context,
-                                          ProjectOverviewScreen(project: p),
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                              ),
+                        onViewProject: (p) => _pushWithCubit(
+                          context,
+                          ProjectOverviewScreen(project: p),
+                        ),
                       ),
                     ],
                   ),

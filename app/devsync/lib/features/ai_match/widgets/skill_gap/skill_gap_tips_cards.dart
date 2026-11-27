@@ -140,8 +140,7 @@ class _FocusCard extends StatelessWidget {
                       label: 'Why it matters: ',
                       text: tip.whyItMatters,
                     ),
-                  if (tip.whyItMatters.isNotEmpty &&
-                      tip.whatToLearn.isNotEmpty)
+                  if (tip.whyItMatters.isNotEmpty && tip.whatToLearn.isNotEmpty)
                     const SizedBox(height: 8),
                   if (tip.whatToLearn.isNotEmpty)
                     _LabeledLine(
@@ -287,7 +286,7 @@ class _HighlightRow extends StatelessWidget {
                 child: Image.network(
                   url,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SkillGapIconTile(
+                  errorBuilder: (_, _, _) => const SkillGapIconTile(
                     icon: Icons.person_outline_rounded,
                     size: 36,
                   ),
