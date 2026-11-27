@@ -2,6 +2,8 @@ import 'package:devsync/core/routing/app_router.dart';
 import 'package:devsync/core/theme/app_colors.dart';
 import 'package:devsync/core/theme/app_styles.dart';
 import 'package:devsync/core/utils/date_format_utils.dart';
+import 'package:devsync/features/profile/data/model/detected_skill.dart';
+import 'package:devsync/features/profile/data/services/github_service.dart';
 import 'package:flutter/material.dart';
 import '../../data/app_state.dart';
 import '../../data/models/models.dart';
@@ -325,45 +327,114 @@ class _ReviewNoteBanner extends StatelessWidget {
   }
 }
 
-class _PrLinkCard extends StatelessWidget {
+class _PrLinkCard extends StatefulWidget {
   const _PrLinkCard({required this.url});
 
   final String url;
 
   @override
+  State<_PrLinkCard> createState() => _PrLinkCardState();
+}
+
+class _PrLinkCardState extends State<_PrLinkCard> {
+  late Future<GithubPrInfo?> _prFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _prFuture = GithubService().fetchPullRequestStatus(widget.url);
+  }
+
+  @override
+  void didUpdateWidget(covariant _PrLinkCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _prFuture = GithubService().fetchPullRequestStatus(widget.url);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    return AppCard(
-      onTap: () => openExternalUrl(context, url),
-      child: Row(
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: c.subtleBlueSurface,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(Icons.merge_type_rounded, color: c.primary, size: 18),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Pull Request', style: AppStyles.body11Secondary(context)),
-                Text(
-                  url,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppStyles.body12SemiBold(context, color: c.primary),
+    return FutureBuilder<GithubPrInfo?>(
+      future: _prFuture,
+      builder: (context, snapshot) {
+        final pr = snapshot.data;
+        final statusColor = pr == null
+            ? c.primary
+            : pr.merged
+            ? c.primary
+            : pr.state.toLowerCase() == 'open'
+            ? c.success
+            : c.error;
+
+        return AppCard(
+          onTap: () => openExternalUrl(context, widget.url),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: c.subtle(statusColor),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              ],
-            ),
+                child: Icon(
+                  Icons.merge_type_rounded,
+                  color: statusColor,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          pr != null ? 'PR #${pr.number}' : 'Pull Request',
+                          style: AppStyles.body11Secondary(context),
+                        ),
+                        if (pr != null) ...[
+                          const SizedBox(width: 6),
+                          Pill(
+                            pr.displayStatus,
+                            fg: statusColor,
+                            bg: c.subtle(statusColor),
+                            fontSize: 9.5,
+                          ),
+                          if (pr.additions > 0 || pr.deletions > 0) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              '+${pr.additions} / -${pr.deletions}',
+                              style: AppStyles.caption10Bold(
+                                context,
+                                color: c.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      pr != null ? pr.title : widget.url,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppStyles.body12SemiBold(
+                        context,
+                        color: c.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.open_in_new_rounded, size: 16, color: c.primary),
+            ],
           ),
-          Icon(Icons.open_in_new_rounded, size: 16, color: c.primary),
-        ],
-      ),
+        );
+      },
     );
   }
 }

@@ -75,7 +75,7 @@ class ReviewSkillsScreen extends StatelessWidget {
       actions: [
         IconButton(
           tooltip: 'Disconnect GitHub',
-          icon: const Icon(Icons.link_off, size: 20),
+          icon: Icon(Icons.link_off, size: 20, color: c.error),
           onPressed: () async {
             final ok = await showDisconnectGithubDialog(
               context,

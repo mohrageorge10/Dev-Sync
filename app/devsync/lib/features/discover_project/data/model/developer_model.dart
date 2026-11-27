@@ -7,6 +7,7 @@ import 'package:devsync/features/discover_project/data/model/filter_matching.dar
 import 'package:devsync/features/discover_project/data/model/filter_state.dart';
 import 'package:devsync/features/discover_project/data/model/portfolio_data.dart';
 import 'package:devsync/features/discover_project/data/model/project_model.dart';
+import 'package:devsync/features/profile/data/model/detected_skill.dart';
 import 'package:flutter/material.dart';
 
 // Connected social account link item.
@@ -51,6 +52,7 @@ class DeveloperModel {
     this.cvFileName,
     this.isOnline = false,
     this.lastSeen,
+    this.githubAnalysis,
     this.projects = const [],
   });
 
@@ -117,6 +119,16 @@ class DeveloperModel {
 
     final matchPercent = (78 + (skills.length * 4)).clamp(75, 98);
 
+    final rawGhStats = map['githubStats'] is Map
+        ? Map<String, dynamic>.from(map['githubStats'] as Map)
+        : const <String, dynamic>{};
+    final ghAnalysis = rawGhStats.isNotEmpty
+        ? GithubAnalysis.fromFirestoreMap(rawGhStats)
+        : null;
+    final realRepos = ghAnalysis?.repos ?? 0;
+    final realCommits = ghAnalysis?.commits ?? 0;
+    final realPrs = ghAnalysis?.prsMerged ?? 0;
+
     return DeveloperModel(
       id: id,
       name: (map[FirebaseConstants.fieldName] ?? 'Developer').toString(),
@@ -128,9 +140,10 @@ class DeveloperModel {
       skills: skills,
       bio: bio,
       matchPercent: matchPercent,
-      repositoriesCount: '${8 + skills.length * 2}',
-      commitsCount: '${180 + skills.length * 45}',
-      projectsCount: '${2 + (skills.length ~/ 2)}',
+      repositoriesCount: '$realRepos',
+      commitsCount: '$realCommits',
+      projectsCount: '$realPrs',
+      githubAnalysis: ghAnalysis,
       githubUrl: githubUrl,
       portfolioUrl: (rawPortfolio != null && rawPortfolio.isNotEmpty)
           ? rawPortfolio
@@ -179,6 +192,7 @@ class DeveloperModel {
   final String? cvFileName;
   final bool isOnline;
   final DateTime? lastSeen;
+  final GithubAnalysis? githubAnalysis;
   final List<PortfolioProjectData> projects;
 
   bool get hasCv => cvUrl != null && cvUrl!.trim().isNotEmpty;

@@ -10,7 +10,7 @@ import 'package:devsync/features/profile/presentation/widgets/profile_scaffold.d
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-// Multi-step progress screen while analyzing a connected GitHub profile.
+// Multi-step progress screen while analyzing a real GitHub profile via REST API.
 class AnalysisScreen extends StatefulWidget {
   const AnalysisScreen({super.key});
 
@@ -22,7 +22,9 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   final _service = GithubService();
   int _step = 0;
   bool _failed = false;
+  String? _errorMessage;
   bool _started = false;
+  final List<String> _liveHints = List<String>.from(GithubService.stepHints);
 
   @override
   void didChangeDependencies() {
@@ -33,27 +35,54 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     }
   }
 
+  String _resolveGithubUsername(ProfileController profile) {
+    final arg = ModalRoute.of(context)?.settings.arguments;
+    if (arg is String && arg.trim().isNotEmpty) {
+      return GithubService.extractUsername(arg);
+    }
+    final fromLink = GithubService.extractUsername(profile.githubUrl);
+    if (fromLink.isNotEmpty) return fromLink;
+    return GithubService.extractUsername(profile.username);
+  }
+
   Future<void> _run() async {
     setState(() {
       _failed = false;
+      _errorMessage = null;
       _step = 0;
+      for (var i = 0; i < GithubService.stepHints.length; i++) {
+        _liveHints[i] = GithubService.stepHints[i];
+      }
     });
     final profile = ProfileScope.of(context);
+    final targetHandle = _resolveGithubUsername(profile);
     try {
       final result = await _service.analyze(
-        (i) {
-          if (mounted) setState(() => _step = i);
+        (i, {String? hint}) {
+          if (!mounted) return;
+          setState(() {
+            _step = i;
+            if (hint != null && i >= 0 && i < _liveHints.length) {
+              _liveHints[i] = hint;
+            }
+          });
         },
-        username: profile.username,
+        username: targetHandle,
       );
       if (!mounted) return;
+      profile.setLinks(github: 'https://github.com/${result.username}');
       profile.setAnalysis(result);
       profile.markGithubConnected();
       await profile.saveProfile();
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, AppRoutes.profileGithubReview);
-    } on GithubException {
-      if (mounted) setState(() => _failed = true);
+    } on GithubException catch (e) {
+      if (mounted) {
+        setState(() {
+          _failed = true;
+          _errorMessage = e.message;
+        });
+      }
     }
   }
 
@@ -96,7 +125,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
           Text('Analyzing your work', style: AppStyles.h2(context)),
           const SizedBox(height: 6),
           Text(
-            "This usually takes a few seconds. We're assembling your verified tech profile.",
+            "This usually takes a few seconds. We're assembling your verified tech profile from GitHub.",
             textAlign: TextAlign.center,
             style: AppStyles.body13Secondary(context),
           ),
@@ -124,7 +153,12 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 ),
                 const SizedBox(height: 10),
                 for (var i = 0; i < 4; i++)
-                  _PipelineRow(index: i, current: _step, failed: _failed),
+                  _PipelineRow(
+                    index: i,
+                    current: _step,
+                    failed: _failed,
+                    hint: _liveHints[i],
+                  ),
               ],
             ),
           ),
@@ -141,16 +175,17 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Connection Interrupted',
+                          'GitHub Sync Failed',
                           style: AppStyles.body13Bold(context),
                         ),
                       ),
-                      ProfileTag('FALLBACK', fg: c.error, bg: c.subtle(c.error)),
+                      ProfileTag('ERROR', fg: c.error, bg: c.subtle(c.error)),
                     ],
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    "Couldn't reach GitHub. You can continue with your manual profile setup or reattempt sync.",
+                    _errorMessage ??
+                        "Couldn't reach GitHub. You can change the username or retry.",
                     style: AppStyles.body12Secondary(context),
                   ),
                   const SizedBox(height: 12),
@@ -166,9 +201,12 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: ProfilePrimaryButton(
-                          'Continue',
-                          icon: Icons.arrow_forward_rounded,
-                          onPressed: () => Navigator.pop(context),
+                          'Change Handle',
+                          icon: Icons.edit_outlined,
+                          onPressed: () => Navigator.pushReplacementNamed(
+                            context,
+                            AppRoutes.profileGithubConnect,
+                          ),
                         ),
                       ),
                     ],
@@ -188,11 +226,13 @@ class _PipelineRow extends StatelessWidget {
     required this.index,
     required this.current,
     required this.failed,
+    required this.hint,
   });
 
   final int index;
   final int current;
   final bool failed;
+  final String hint;
 
   @override
   Widget build(BuildContext context) {
@@ -242,7 +282,7 @@ class _PipelineRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  GithubService.stepHints[index],
+                  hint,
                   style: AppStyles.body11Medium(
                     context,
                     color: running ? c.primary : c.textSecondary,

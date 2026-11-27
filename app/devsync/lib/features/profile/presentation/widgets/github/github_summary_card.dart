@@ -47,44 +47,46 @@ class GithubSummaryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: Row(
+          if (entries.isNotEmpty) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: Row(
+                children: [
+                  for (var i = 0; i < entries.length; i++)
+                    Expanded(
+                      flex: entries[i].value.clamp(1, 100),
+                      child: Container(
+                        height: 6,
+                        color: langColors[i % langColors.length],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 12,
+              runSpacing: 4,
               children: [
                 for (var i = 0; i < entries.length; i++)
-                  Expanded(
-                    flex: entries[i].value,
-                    child: Container(
-                      height: 6,
-                      color: langColors[i % langColors.length],
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircleAvatar(
+                        radius: 3,
+                        backgroundColor: langColors[i % langColors.length],
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${entries[i].key} ${entries[i].value}%',
+                        style: AppStyles.caption10Bold(context),
+                      ),
+                    ],
                   ),
               ],
             ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 12,
-            runSpacing: 4,
-            children: [
-              for (var i = 0; i < entries.length; i++)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircleAvatar(
-                      radius: 3,
-                      backgroundColor: langColors[i % langColors.length],
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${entries[i].key} ${entries[i].value}%',
-                      style: AppStyles.caption10Bold(context),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
+            const SizedBox(height: 10),
+          ],
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -95,7 +97,7 @@ class GithubSummaryCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _StatItem('${analysis.repos}', 'Repositories'),
-                _StatItem('${analysis.commits}', 'Commits (12m)'),
+                _StatItem('${analysis.commits}', 'Recent Commits'),
                 _StatItem('${analysis.prsMerged}', 'PRs Merged'),
               ],
             ),

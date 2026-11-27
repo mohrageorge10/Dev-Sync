@@ -7,6 +7,7 @@ import 'package:devsync/features/discover_project/presentation/cubit/discover/di
 import 'package:devsync/features/my_projects/presentation/cubit/my_projects_cubit.dart';
 import 'package:devsync/features/my_teams/data/app_state.dart';
 import 'package:devsync/features/profile/presentation/cubit/profile_controller.dart';
+import 'package:devsync/features/profile/presentation/widgets/github/github_summary_card.dart';
 import 'package:devsync/features/profile/presentation/widgets/profile_buttons.dart';
 import 'package:devsync/features/profile/presentation/widgets/profile_scaffold.dart';
 import 'package:devsync/features/profile/presentation/widgets/snapshot/snapshot_credentials_section.dart';
@@ -58,6 +59,42 @@ class DeveloperSnapshotScreen extends StatelessWidget {
               children: [
                 SnapshotHeaderCard(profile: profile),
                 SnapshotSkillsSection(profile: profile),
+                if (profile.githubConnected && profile.analysis != null) ...[
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'GitHub Activity',
+                          style: AppStyles.title15Bold(context),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () async {
+                          await Navigator.pushNamed(
+                            context,
+                            AppRoutes.profileGithubAnalysis,
+                            arguments: profile.analysis!.username,
+                          );
+                          onProfileUpdated?.call();
+                        },
+                        icon: Icon(
+                          Icons.refresh_rounded,
+                          size: 16,
+                          color: c.primary,
+                        ),
+                        label: Text(
+                          'Re-sync',
+                          style: AppStyles.body12Bold(
+                            context,
+                            color: c.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  GithubSummaryCard(analysis: profile.analysis!),
+                ],
                 SnapshotCredentialsSection(
                   profile: profile,
                   onProfileUpdated: onProfileUpdated,

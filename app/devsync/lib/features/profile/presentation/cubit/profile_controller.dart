@@ -175,6 +175,12 @@ class ProfileController extends ChangeNotifier {
         githubUrl = 'https://github.com/${ghUser.trim()}';
       }
       githubConnected = doc[FirebaseConstants.fieldGithubConnected] == true;
+      final rawGhStats = doc['githubStats'];
+      if (rawGhStats is Map) {
+        analysis = GithubAnalysis.fromFirestoreMap(
+          Map<String, dynamic>.from(rawGhStats),
+        );
+      }
     } else if (_repository.currentDisplayName != null && displayName.isEmpty) {
       displayName = _repository.currentDisplayName!;
       username = _deriveUsername(displayName);
@@ -213,6 +219,7 @@ class ProfileController extends ChangeNotifier {
       FirebaseConstants.fieldLinkedinUrl: linkedin.trim(),
       FirebaseConstants.fieldGithubUsername: ghUsername,
       FirebaseConstants.fieldGithubConnected: githubConnected,
+      'githubStats': githubConnected ? analysis?.toFirestoreMap() : null,
     });
 
     isSaving = false;
