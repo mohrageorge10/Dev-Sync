@@ -7,6 +7,7 @@ import 'package:devsync/features/discover_project/presentation/cubit/discover/di
 import 'package:devsync/features/my_projects/presentation/cubit/my_projects_cubit.dart';
 import 'package:devsync/features/my_teams/data/app_state.dart';
 import 'package:devsync/features/profile/presentation/cubit/profile_controller.dart';
+import 'package:devsync/features/profile/presentation/widgets/behance/behance_portfolio_card.dart';
 import 'package:devsync/features/profile/presentation/widgets/github/github_summary_card.dart';
 import 'package:devsync/features/profile/presentation/widgets/profile_buttons.dart';
 import 'package:devsync/features/profile/presentation/widgets/profile_scaffold.dart';
@@ -94,6 +95,42 @@ class DeveloperSnapshotScreen extends StatelessWidget {
                     ],
                   ),
                   GithubSummaryCard(analysis: profile.analysis!),
+                ],
+                if (profile.behanceConnected &&
+                    profile.behanceProfile != null) ...[
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Behance Portfolio',
+                          style: AppStyles.title15Bold(context),
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () async {
+                          await Navigator.pushNamed(
+                            context,
+                            AppRoutes.profileBehanceConnect,
+                          );
+                          onProfileUpdated?.call();
+                        },
+                        icon: Icon(
+                          Icons.edit_outlined,
+                          size: 16,
+                          color: c.primary,
+                        ),
+                        label: Text(
+                          'Edit',
+                          style: AppStyles.body12Bold(
+                            context,
+                            color: c.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  BehancePortfolioCard(behance: profile.behanceProfile!),
                 ],
                 SnapshotCredentialsSection(
                   profile: profile,

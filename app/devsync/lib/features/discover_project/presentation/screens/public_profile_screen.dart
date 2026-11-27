@@ -21,6 +21,7 @@ import 'package:devsync/features/discover_project/presentation/widgets/profile_s
 import 'package:devsync/features/discover_project/presentation/widgets/public_cv_card.dart';
 import 'package:devsync/features/discover_project/presentation/widgets/skills_section_card.dart';
 import 'package:devsync/features/discover_project/presentation/widgets/social_links_section.dart';
+import 'package:devsync/features/profile/presentation/widgets/behance/behance_portfolio_card.dart';
 import 'package:devsync/features/profile/presentation/widgets/github/github_summary_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -190,6 +191,13 @@ class _ProfileView extends StatelessWidget {
                   text: '@${developer.githubAnalysis!.username}',
                 ),
                 GithubSummaryCard(analysis: developer.githubAnalysis!),
+              ],
+              if (developer.behanceProfile != null) ...[
+                Header(
+                  title: 'Behance Portfolio',
+                  text: '@${developer.behanceProfile!.username}',
+                ),
+                BehancePortfolioCard(behance: developer.behanceProfile!),
               ],
               FutureBuilder<List<PortfolioProjectData>>(
                 future: ServiceLocator.isRegistered<DiscoverRepository>()

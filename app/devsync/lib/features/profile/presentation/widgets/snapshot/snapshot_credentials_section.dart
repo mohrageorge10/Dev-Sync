@@ -4,6 +4,7 @@ import 'package:devsync/core/shared/feedback/app_feedback.dart';
 import 'package:devsync/core/theme/app_colors.dart';
 import 'package:devsync/core/theme/app_styles.dart';
 import 'package:devsync/features/profile/presentation/cubit/profile_controller.dart';
+import 'package:devsync/features/profile/presentation/screens/behance/disconnect_behance_dialog.dart';
 import 'package:devsync/features/profile/presentation/screens/github/disconnect_dialog.dart';
 import 'package:devsync/features/profile/presentation/widgets/delete_cv_dialog.dart';
 import 'package:devsync/features/profile/presentation/widgets/profile_card.dart';
@@ -251,14 +252,36 @@ class SnapshotCredentialsSection extends StatelessWidget {
                   color: c.textPrimary,
                 ),
                 name: 'Behance',
-                status: 'Not connected',
-                button: ProfileCompactButton(
-                  'Connect',
-                  onPressed: () => AppFeedback.show(
-                    context,
-                    message: 'Behance integration coming soon.',
-                  ),
-                ),
+                status: profile.behanceConnected && profile.behanceProfile != null
+                    ? '@${profile.behanceProfile!.username}'
+                    : 'Not connected',
+                button: profile.behanceConnected
+                    ? ProfileCompactButton(
+                        'Disconnect',
+                        color: c.error,
+                        onPressed: () async {
+                          final confirmed = await showDisconnectBehanceDialog(
+                            context,
+                            shotsCount:
+                                profile.behanceProfile?.shots.length ?? 0,
+                          );
+                          if (confirmed) {
+                            profile.disconnectBehance();
+                            await profile.saveProfile();
+                            onProfileUpdated?.call();
+                          }
+                        },
+                      )
+                    : ProfileCompactButton(
+                        'Connect',
+                        onPressed: () async {
+                          await Navigator.pushNamed(
+                            context,
+                            AppRoutes.profileBehanceConnect,
+                          );
+                          onProfileUpdated?.call();
+                        },
+                      ),
               ),
             ],
           ),

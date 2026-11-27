@@ -1,9 +1,9 @@
 import 'package:devsync/core/constants/app_images.dart';
 import 'package:devsync/core/routing/app_routes.dart';
-import 'package:devsync/core/shared/feedback/app_feedback.dart';
 import 'package:devsync/core/theme/app_colors.dart';
 import 'package:devsync/core/theme/app_styles.dart';
 import 'package:devsync/features/profile/presentation/cubit/profile_controller.dart';
+import 'package:devsync/features/profile/presentation/screens/behance/disconnect_behance_dialog.dart';
 import 'package:devsync/features/profile/presentation/screens/github/disconnect_dialog.dart';
 import 'package:devsync/features/profile/presentation/widgets/profile_buttons.dart';
 import 'package:devsync/features/profile/presentation/widgets/profile_card.dart';
@@ -172,23 +172,64 @@ class ConnectWorkScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const ProfileTag('Design & UI/UX'),
+                    if (profile.behanceConnected)
+                      ProfileTag(
+                        'Connected',
+                        fg: c.success,
+                        bg: c.subtle(c.success),
+                      )
+                    else
+                      const ProfileTag('Design & UI/UX'),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Import design portfolios and creative case studies if you contribute to UI/UX tracks.',
+                  'Showcase your design portfolio, UI/UX tools, and featured Behance case studies.',
                   style: AppStyles.body12Secondary(context),
                 ),
                 const SizedBox(height: 12),
-                ProfileSoftButton(
-                  'Connect Behance',
-                  icon: Icons.palette_outlined,
-                  onPressed: () => AppFeedback.show(
-                    context,
-                    message: 'Behance integration coming soon.',
+                if (profile.behanceConnected)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ProfileSoftButton(
+                          'Edit Portfolio',
+                          icon: Icons.palette_outlined,
+                          onPressed: () => Navigator.pushNamed(
+                            context,
+                            AppRoutes.profileBehanceConnect,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ProfileSoftButton(
+                          'Disconnect',
+                          icon: Icons.link_off,
+                          onPressed: () async {
+                            final confirmed = await showDisconnectBehanceDialog(
+                              context,
+                              shotsCount:
+                                  profile.behanceProfile?.shots.length ?? 0,
+                            );
+                            if (confirmed) {
+                              profile.disconnectBehance();
+                              await profile.saveProfile();
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  ProfileSoftButton(
+                    'Connect Behance',
+                    icon: Icons.palette_outlined,
+                    onPressed: () => Navigator.pushNamed(
+                      context,
+                      AppRoutes.profileBehanceConnect,
+                    ),
                   ),
-                ),
               ],
             ),
           ),

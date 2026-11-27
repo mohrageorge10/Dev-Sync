@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:devsync/core/services/firebase/firebase_constants.dart';
+import 'package:devsync/features/profile/data/model/behance_profile.dart';
 import 'package:devsync/features/profile/data/model/detected_skill.dart';
 import 'package:devsync/features/profile/data/repositories/profile_repository.dart';
 import 'package:flutter/material.dart';
@@ -65,10 +66,12 @@ class ProfileController extends ChangeNotifier {
   String linkedin = '';
   String githubUrl = '';
 
-  // GitHub state.
+  // GitHub & Behance state.
   bool githubConnected = false;
   GithubAnalysis? analysis;
   final Set<String> verifiedSkills = {};
+  bool behanceConnected = false;
+  BehanceProfile? behanceProfile;
 
   static const int maxSoftSkills = 4;
   static const List<String> levels = [
@@ -181,6 +184,17 @@ class ProfileController extends ChangeNotifier {
           Map<String, dynamic>.from(rawGhStats),
         );
       }
+      behanceConnected = doc['behanceConnected'] == true;
+      final rawBehance = doc['behanceProfile'];
+      if (rawBehance is Map) {
+        final parsed = BehanceProfile.fromFirestoreMap(
+          Map<String, dynamic>.from(rawBehance),
+        );
+        if (parsed.username.isNotEmpty) {
+          behanceProfile = parsed;
+          behanceConnected = true;
+        }
+      }
     } else if (_repository.currentDisplayName != null && displayName.isEmpty) {
       displayName = _repository.currentDisplayName!;
       username = _deriveUsername(displayName);
@@ -220,6 +234,12 @@ class ProfileController extends ChangeNotifier {
       FirebaseConstants.fieldGithubUsername: ghUsername,
       FirebaseConstants.fieldGithubConnected: githubConnected,
       'githubStats': githubConnected ? analysis?.toFirestoreMap() : null,
+      'behanceConnected': behanceConnected,
+      'behanceUsername': behanceConnected ? behanceProfile?.username : null,
+      'behanceUrl': behanceConnected ? behanceProfile?.profileUrl : null,
+      'behanceProfile': behanceConnected
+          ? behanceProfile?.toFirestoreMap()
+          : null,
     });
 
     isSaving = false;
@@ -265,6 +285,8 @@ class ProfileController extends ChangeNotifier {
     githubConnected = false;
     analysis = null;
     verifiedSkills.clear();
+    behanceConnected = false;
+    behanceProfile = null;
     notifyListeners();
   }
 
@@ -525,6 +547,16 @@ class ProfileController extends ChangeNotifier {
     githubUrl = '';
   });
 
+  void setBehanceProfile(BehanceProfile profile) => _update(() {
+    behanceProfile = profile;
+    behanceConnected = profile.username.isNotEmpty;
+  });
+
+  void disconnectBehance() => _update(() {
+    behanceConnected = false;
+    behanceProfile = null;
+  });
+
   // Validation messages for step footers (null means valid).
   String? get basicBlockedReason => displayName.trim().isEmpty
       ? 'Enter your display name to continue'
@@ -553,8 +585,9 @@ class ProfileController extends ChangeNotifier {
       ? 'Enter your LinkedIn profile URL to continue'
       : null;
 
-  String? get connectWorkBlockedReason =>
-      !githubConnected ? 'Connect your GitHub account to continue' : null;
+  String? get connectWorkBlockedReason => (!githubConnected && !behanceConnected)
+      ? 'Connect your GitHub or Behance account to continue'
+      : null;
 
   // Profile completion checklist.
   List<ChecklistItem> get checklist => [

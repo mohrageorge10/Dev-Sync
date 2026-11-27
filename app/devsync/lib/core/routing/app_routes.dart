@@ -42,6 +42,7 @@ class AppRoutes {
   static const String profileGithubConnect = '/profile/github/connect';
   static const String profileGithubAnalysis = '/profile/github/analysis';
   static const String profileGithubReview = '/profile/github/review';
+  static const String profileBehanceConnect = '/profile/behance/connect';
   static const String profileCvViewer = '/profile/cv-viewer';
 
   // ============== My Teams ===============

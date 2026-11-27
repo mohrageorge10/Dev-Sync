@@ -7,6 +7,7 @@ import 'package:devsync/features/discover_project/data/model/filter_matching.dar
 import 'package:devsync/features/discover_project/data/model/filter_state.dart';
 import 'package:devsync/features/discover_project/data/model/portfolio_data.dart';
 import 'package:devsync/features/discover_project/data/model/project_model.dart';
+import 'package:devsync/features/profile/data/model/behance_profile.dart';
 import 'package:devsync/features/profile/data/model/detected_skill.dart';
 import 'package:flutter/material.dart';
 
@@ -53,6 +54,7 @@ class DeveloperModel {
     this.isOnline = false,
     this.lastSeen,
     this.githubAnalysis,
+    this.behanceProfile,
     this.projects = const [],
   });
 
@@ -125,6 +127,16 @@ class DeveloperModel {
     final ghAnalysis = rawGhStats.isNotEmpty
         ? GithubAnalysis.fromFirestoreMap(rawGhStats)
         : null;
+    final rawBehance = map['behanceProfile'] is Map
+        ? Map<String, dynamic>.from(map['behanceProfile'] as Map)
+        : const <String, dynamic>{};
+    final parsedBehance = rawBehance.isNotEmpty
+        ? BehanceProfile.fromFirestoreMap(rawBehance)
+        : null;
+    final behance =
+        (parsedBehance != null && parsedBehance.username.isNotEmpty)
+        ? parsedBehance
+        : null;
     final realRepos = ghAnalysis?.repos ?? 0;
     final realCommits = ghAnalysis?.commits ?? 0;
     final realPrs = ghAnalysis?.prsMerged ?? 0;
@@ -144,6 +156,7 @@ class DeveloperModel {
       commitsCount: '$realCommits',
       projectsCount: '$realPrs',
       githubAnalysis: ghAnalysis,
+      behanceProfile: behance,
       githubUrl: githubUrl,
       portfolioUrl: (rawPortfolio != null && rawPortfolio.isNotEmpty)
           ? rawPortfolio
@@ -193,6 +206,7 @@ class DeveloperModel {
   final bool isOnline;
   final DateTime? lastSeen;
   final GithubAnalysis? githubAnalysis;
+  final BehanceProfile? behanceProfile;
   final List<PortfolioProjectData> projects;
 
   bool get hasCv => cvUrl != null && cvUrl!.trim().isNotEmpty;
@@ -264,6 +278,14 @@ class DeveloperModel {
           subtitle: githubUrl!.trim(),
           url: githubUrl!.trim(),
           isConnected: hasGithub,
+        ),
+      if (behanceProfile != null && behanceProfile!.username.isNotEmpty)
+        SocialLinkItem(
+          icon: Icons.palette_outlined,
+          title: 'Behance',
+          subtitle: behanceProfile!.profileUrl,
+          url: behanceProfile!.profileUrl,
+          isConnected: true,
         ),
       if (portfolioUrl != null && portfolioUrl!.trim().isNotEmpty)
         SocialLinkItem(
