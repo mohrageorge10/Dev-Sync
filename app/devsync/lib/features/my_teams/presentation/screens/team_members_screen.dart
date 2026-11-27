@@ -78,6 +78,7 @@ class TeamMembersScreen extends StatelessWidget {
             MemberTile(
               member: m,
               isMe: m.id == state.me.id,
+              isOnline: state.isMemberOnline(m.id),
               onManageTap: isOwner
                   ? () => m.isOwner
                         ? _showOwnerSelfRoleSheet(context, state, team, m)

@@ -38,22 +38,38 @@ class ProjectOverviewScreen extends StatelessWidget {
     );
   }
 
-  void _openTeamWorkspace(BuildContext context, ProjectModel current) {
+  Future<void> _openTeamWorkspace(
+    BuildContext context,
+    ProjectModel current,
+  ) async {
     if (ServiceLocator.isRegistered<TeamsController>()) {
       final teamsCtrl = ServiceLocator.get<TeamsController>();
-      final match = teamsCtrl.teams
+      var match = teamsCtrl.teams
           .where(
             (t) =>
                 t.id == current.id ||
                 t.name.toLowerCase() == current.name.toLowerCase(),
           )
           .firstOrNull;
+      if (match == null) {
+        await context.read<MyProjectsCubit>().ensureTeamWorkspace(current);
+        if (!context.mounted) return;
+        match = teamsCtrl.teams
+            .where(
+              (t) =>
+                  t.id == current.id ||
+                  t.name.toLowerCase() == current.name.toLowerCase(),
+            )
+            .firstOrNull;
+      }
       if (match != null) {
         AppRouter.toWorkspace(context, match);
         return;
       }
     }
-    Navigator.of(context).pushNamed(AppRoutes.myTeams);
+    if (context.mounted) {
+      Navigator.of(context).pushNamed(AppRoutes.myTeams);
+    }
   }
 
   Future<void> _pickDeveloperToInvite(BuildContext context) async {

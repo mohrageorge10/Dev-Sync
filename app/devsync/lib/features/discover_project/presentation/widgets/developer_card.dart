@@ -48,8 +48,10 @@ class DeveloperCard extends StatelessWidget {
                 for (final s in developer.skills) AppSkillChip(label: s),
               ],
             ),
-            const SizedBox(height: 12),
-            InfoBanner(text: developer.bio),
+            if (developer.bio.trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              InfoBanner(text: developer.bio),
+            ],
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
@@ -121,19 +123,20 @@ class DeveloperCard extends StatelessWidget {
                     style: AppStyles.avatarInitials(26, avatarColor),
                   ),
           ),
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: Container(
-              width: 14,
-              height: 14,
-              decoration: BoxDecoration(
-                color: c.success,
-                shape: BoxShape.circle,
-                border: Border.all(color: c.backgroundPrimary, width: 2),
+          if (developer.isOnline)
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: c.success,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: c.backgroundPrimary, width: 2),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

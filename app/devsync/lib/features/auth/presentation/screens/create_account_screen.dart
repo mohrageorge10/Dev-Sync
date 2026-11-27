@@ -1,10 +1,15 @@
+import 'dart:async';
+
 import 'package:devsync/core/animations/app_fade_slide.dart';
 import 'package:devsync/core/di/service_locator.dart';
 import 'package:devsync/core/routing/app_routes.dart';
 import 'package:devsync/core/shared/buttons/app_primary_button.dart';
 import 'package:devsync/core/shared/feedback/app_feedback.dart';
 import 'package:devsync/core/shared/input_fields/app_input_field.dart';
+import 'package:devsync/core/theme/app_colors.dart';
+import 'package:devsync/core/theme/app_styles.dart';
 import 'package:devsync/core/utils/validators.dart';
+import 'package:devsync/features/auth/data/repositories/auth_repository.dart';
 import 'package:devsync/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:devsync/features/auth/presentation/cubit/auth_state.dart';
 import 'package:devsync/features/auth/presentation/widgets/auth_back_button.dart';
@@ -41,22 +46,96 @@ class _CreateAccountView extends StatefulWidget {
 class _CreateAccountViewState extends State<_CreateAccountView> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
+  final _usernameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   bool _agreed = false;
 
+  Timer? _usernameDebounce;
+  bool _checkingUsername = false;
+  bool? _usernameAvailable;
+
   @override
   void dispose() {
+    _usernameDebounce?.cancel();
     _nameCtrl.dispose();
+    _usernameCtrl.dispose();
     _emailCtrl.dispose();
     _passCtrl.dispose();
     _confirmCtrl.dispose();
     super.dispose();
   }
 
+  String? _validateUsername(String? v) {
+    final clean = (v ?? '').trim().replaceAll('@', '');
+    if (clean.length < 3) return 'Username must be at least 3 characters';
+    if (!RegExp(r'^[a-zA-Z0-9._]+$').hasMatch(clean)) {
+      return 'Use only letters, numbers, dots, or underscores';
+    }
+    if (_usernameAvailable == false) {
+      return 'This username is already taken';
+    }
+    return null;
+  }
+
+  void _onUsernameChanged(String value) {
+    _usernameDebounce?.cancel();
+    final clean = value.trim().replaceAll('@', '');
+    if (clean.length < 3 || !RegExp(r'^[a-zA-Z0-9._]+$').hasMatch(clean)) {
+      setState(() {
+        _checkingUsername = false;
+        _usernameAvailable = null;
+      });
+      return;
+    }
+    setState(() {
+      _checkingUsername = true;
+      _usernameAvailable = null;
+    });
+    _usernameDebounce = Timer(const Duration(milliseconds: 400), () async {
+      final available = await ServiceLocator.get<AuthRepository>()
+          .isUsernameAvailable(clean);
+      if (!mounted) return;
+      if (_usernameCtrl.text.trim().replaceAll('@', '') != clean) return;
+      setState(() {
+        _checkingUsername = false;
+        _usernameAvailable = available;
+      });
+    });
+  }
+
+  Widget? _usernameSuffix(BuildContext context) {
+    final c = context.colors;
+    if (_checkingUsername) {
+      return Padding(
+        padding: const EdgeInsets.all(14),
+        child: SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 2, color: c.primary),
+        ),
+      );
+    }
+    if (_usernameAvailable == true) {
+      return Icon(Icons.check_circle, size: 18, color: c.success);
+    }
+    if (_usernameAvailable == false) {
+      return Icon(Icons.cancel_rounded, size: 18, color: c.error);
+    }
+    return null;
+  }
+
   void _onCreateAccount() {
     if (!_formKey.currentState!.validate()) return;
+    if (_usernameAvailable == false) {
+      showAuthMessage(
+        context,
+        'This username is already taken. Please choose another.',
+        type: AppFeedbackType.warning,
+      );
+      return;
+    }
     if (!_agreed) {
       showAuthMessage(
         context,
@@ -67,6 +146,7 @@ class _CreateAccountViewState extends State<_CreateAccountView> {
     }
     context.read<AuthCubit>().register(
           name: _nameCtrl.text,
+          username: _usernameCtrl.text,
           email: _emailCtrl.text,
           password: _passCtrl.text,
         );
@@ -114,6 +194,46 @@ class _CreateAccountViewState extends State<_CreateAccountView> {
                         textInputAction: TextInputAction.next,
                         enabled: !loading,
                         validator: AppValidators.validateName,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    AppFadeSlide(
+                      delay: const Duration(milliseconds: 90),
+                      offsetY: 22,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AppInputField(
+                            controller: _usernameCtrl,
+                            label: 'Username',
+                            hint: 'e.g. alexmorgan',
+                            prefixIcon: Icons.alternate_email,
+                            suffixIcon: _usernameSuffix(context),
+                            textInputAction: TextInputAction.next,
+                            enabled: !loading,
+                            onChanged: _onUsernameChanged,
+                            validator: _validateUsername,
+                          ),
+                          if (_usernameAvailable == false)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Text(
+                                'This username is already taken. Try another one.',
+                                style: AppStyles.body12Error(context),
+                              ),
+                            )
+                          else if (_usernameAvailable == true)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Text(
+                                '@${_usernameCtrl.text.trim().replaceAll('@', '')} is available',
+                                style: AppStyles.body11Medium(
+                                  context,
+                                  color: context.colors.success,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 16),

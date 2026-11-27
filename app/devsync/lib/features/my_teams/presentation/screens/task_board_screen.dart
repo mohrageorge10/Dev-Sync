@@ -20,9 +20,12 @@ class TaskBoardScreen extends StatefulWidget {
 }
 
 class _TaskBoardScreenState extends State<TaskBoardScreen> {
+  static const _unassignedKey = '__unassigned__';
+
   TaskStatus _status = TaskStatus.inProgress;
   Priority? _priority;
   bool _onlyMine = false;
+  String? _selectedMemberId;
 
   @override
   Widget build(BuildContext context) {
@@ -43,32 +46,59 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
     final p = state.progressOf(widget.teamId);
     final pct = p.total == 0 ? 0 : (p.done * 100 / p.total).round();
 
+    final hasMemberFilter = isOwner && _selectedMemberId != null;
+
+    // Filter tasks by priority and selected member (for Owner) or My toggle.
+    bool matchesFilters(TaskItem t) {
+      if (_priority != null && t.priority != _priority) return false;
+      if (isOwner) {
+        if (_selectedMemberId == _unassignedKey) {
+          return t.assignee == null;
+        }
+        if (_selectedMemberId != null) {
+          return t.assignee?.id == _selectedMemberId;
+        }
+      } else if (canViewAll && _onlyMine) {
+        return t.assignee?.id == state.me.id;
+      }
+      return true;
+    }
+
+    final filteredAcrossStatuses = scopedTasks.where(matchesFilters).toList();
     final counts = {
       for (final s in TaskStatus.values)
-        s: scopedTasks.where((t) => t.status == s).length,
+        s: filteredAcrossStatuses.where((t) => t.status == s).length,
     };
 
-    // Show unassigned tasks only in To Do and only for the Owner.
-    final unassigned = isOwner && _status == TaskStatus.todo && !_onlyMine
-        ? scopedTasks.where((t) {
-            if (t.status != TaskStatus.todo || t.assignee != null) return false;
-            if (_priority != null && t.priority != _priority) return false;
-            return true;
-          }).toList()
+    // Show separate Unassigned section in To Do for Owner when no member filter is active.
+    final unassigned = isOwner && _status == TaskStatus.todo && !hasMemberFilter
+        ? filteredAcrossStatuses
+            .where((t) => t.status == TaskStatus.todo && t.assignee == null)
+            .toList()
         : const <TaskItem>[];
 
-    final visible = scopedTasks.where((t) {
+    final visible = filteredAcrossStatuses.where((t) {
       if (t.status != _status) return false;
-      if (_priority != null && t.priority != _priority) return false;
-      if (canViewAll && _onlyMine && t.assignee?.id != state.me.id) return false;
       if (isOwner &&
           _status == TaskStatus.todo &&
-          !_onlyMine &&
+          !hasMemberFilter &&
           t.assignee == null) {
         return false;
       }
       return true;
     }).toList();
+
+    final selectedMember = _selectedMemberId == null ||
+            _selectedMemberId == _unassignedKey
+        ? null
+        : team.members.where((m) => m.id == _selectedMemberId).firstOrNull;
+    final memberFilterLabel = _selectedMemberId == _unassignedKey
+        ? 'Unassigned'
+        : selectedMember != null
+        ? (selectedMember.id == state.me.id
+            ? 'My'
+            : selectedMember.name.split(' ').first)
+        : 'Members';
 
     final daysLeftText = team.daysRemaining == null
         ? team.sprint
@@ -114,9 +144,18 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
               TaskFilterChip(
                 icon: Icons.filter_list,
                 label: _priority == null ? 'All Priorities' : _priority!.label,
+                selected: _priority != null,
                 onTap: _pickPriority,
               ),
-              if (canViewAll) ...[
+              if (isOwner) ...[
+                const SizedBox(width: 8),
+                TaskFilterChip(
+                  icon: Icons.people_outline,
+                  label: memberFilterLabel,
+                  selected: hasMemberFilter,
+                  onTap: () => _pickMember(team, state.me.id),
+                ),
+              ] else if (canViewAll) ...[
                 const SizedBox(width: 8),
                 TaskFilterChip(
                   icon: Icons.person_outline,
@@ -217,6 +256,79 @@ class _TaskBoardScreenState extends State<TaskBoardScreen> {
       ),
     );
     if (mounted) setState(() => _priority = res);
+  }
+
+  // Bottom sheet allowing the Owner to filter tasks by a specific team member or unassigned.
+  Future<void> _pickMember(Team team, String myId) async {
+    final c = context.colors;
+    const clearSentinel = '__all__';
+    final res = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: c.backgroundPrimary,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Filter by Member',
+                    style: AppStyles.title15Bold(ctx),
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: Icon(Icons.groups_outlined, color: c.primary),
+                title: Text('All Members', style: AppStyles.body14Primary(ctx)),
+                trailing: _selectedMemberId == null
+                    ? Icon(Icons.check, color: c.primary)
+                    : null,
+                onTap: () => Navigator.pop(ctx, clearSentinel),
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.person_off_outlined,
+                  color: c.textSecondary,
+                ),
+                title: Text('Unassigned', style: AppStyles.body14Primary(ctx)),
+                trailing: _selectedMemberId == _unassignedKey
+                    ? Icon(Icons.check, color: c.primary)
+                    : null,
+                onTap: () => Navigator.pop(ctx, _unassignedKey),
+              ),
+              const Divider(height: 1),
+              for (final m in team.members)
+                ListTile(
+                  leading: Avatar(m.initials, size: 32),
+                  title: Text(
+                    m.id == myId ? '${m.name} (You)' : m.name,
+                    style: AppStyles.body14Primary(ctx),
+                  ),
+                  subtitle: Text(
+                    m.role,
+                    style: AppStyles.body12Secondary(ctx),
+                  ),
+                  trailing: _selectedMemberId == m.id
+                      ? Icon(Icons.check, color: c.primary)
+                      : null,
+                  onTap: () => Navigator.pop(ctx, m.id),
+                ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || res == null) return;
+    setState(() {
+      _selectedMemberId = res == clearSentinel ? null : res;
+    });
   }
 }
 

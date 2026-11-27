@@ -37,6 +37,16 @@ class ProfileRepository {
     }
   }
 
+  // Real-time stream of the current user's profile document.
+  Stream<Map<String, dynamic>?> watchProfile() {
+    final uid = _auth.currentUserId;
+    if (uid == null) return const Stream.empty();
+    return _firestore.documentStream(
+      collectionPath: FirebaseConstants.usersCollection,
+      docId: uid,
+    );
+  }
+
   // Upload an avatar image to Cloudinary and persist its URL in Firestore.
   Future<String> uploadAvatar({
     required Uint8List bytes,
@@ -86,6 +96,13 @@ class ProfileRepository {
         if (uid != null && docUid == uid) continue;
         final existing = (doc['username'] ?? '').toString().trim().toLowerCase();
         if (existing == normalized) return false;
+        if (existing.isEmpty) {
+          final derived = (doc[FirebaseConstants.fieldName] ?? '')
+              .toString()
+              .toLowerCase()
+              .replaceAll(RegExp(r'[^a-z0-9]'), '');
+          if (derived == normalized) return false;
+        }
       }
       return true;
     } catch (_) {

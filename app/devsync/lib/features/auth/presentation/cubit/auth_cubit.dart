@@ -34,12 +34,14 @@ class AuthCubit extends Cubit<AuthState> {
 
   Future<void> register({
     required String name,
+    required String username,
     required String email,
     required String password,
   }) =>
       _run(() async {
         final user = await _repo.register(
           name: name.trim(),
+          username: username.trim(),
           email: email.trim(),
           password: password,
         );

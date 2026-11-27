@@ -7,12 +7,13 @@ class MyProjectsInitial extends MyProjectsState {}
 
 class MyProjectsLoading extends MyProjectsState {}
 
-// Loaded state holding projects, invitations, applicants, and feedback message.
+// Loaded state holding projects, invitations, applicants, outgoing applications, and feedback message.
 class MyProjectsLoaded extends MyProjectsState {
   MyProjectsLoaded({
     required this.projects,
     required this.invitations,
     required this.applicants,
+    this.myApplications = const [],
     this.sentInvitations = 0,
     this.message,
   });
@@ -20,6 +21,7 @@ class MyProjectsLoaded extends MyProjectsState {
   final List<ProjectModel> projects;
   final List<InvitationModel> invitations;
   final List<ApplicantModel> applicants;
+  final List<MyApplicationModel> myApplications;
   final int sentInvitations;
   final String? message;
 

@@ -1,12 +1,16 @@
+import 'dart:async';
+
 import 'package:devsync/core/di/service_locator.dart';
 import 'package:devsync/features/discover_project/data/model/developer_model.dart'
     as discover;
 import 'package:devsync/features/my_teams/data/app_state.dart';
 import 'package:devsync/features/my_teams/data/models/models.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
 import '../../data/models/applicant_model.dart';
 import '../../data/models/developer_model.dart';
 import '../../data/models/invitation_model.dart';
+import '../../data/models/my_application_model.dart';
 import '../../data/models/project_model.dart';
 import '../../data/repo/my_projects_repo.dart';
 
@@ -18,6 +22,12 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
 
   final MyProjectsRepo repo;
   List<DeveloperModel> developers = [];
+
+  StreamSubscription<List<ProjectModel>>? _ownedSub;
+  StreamSubscription<List<ProjectModel>>? _joinedSub;
+  StreamSubscription<List<InvitationModel>>? _invitesSub;
+  StreamSubscription<List<ApplicantModel>>? _applicantsSub;
+  StreamSubscription<List<MyApplicationModel>>? _myAppsSub;
 
   TeamsController? get _teamsController =>
       ServiceLocator.isRegistered<TeamsController>()
@@ -61,12 +71,15 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
     emit(MyProjectsLoading());
     try {
       final projects = await repo.getProjects();
-      final ownedIds =
-          projects.where((p) => p.isOwner).map((p) => p.id).toList();
+      final ownedIds = projects
+          .where((p) => p.isOwner)
+          .map((p) => p.id)
+          .toList();
       final results = await Future.wait([
         repo.getInvitations(),
         repo.getApplicants(ownedProjectIds: ownedIds),
         repo.getDevelopers(),
+        repo.getMyApplications(),
       ]);
       if (isClosed) return;
       developers = results[2] as List<DeveloperModel>;
@@ -75,13 +88,143 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
           projects: projects,
           invitations: results[0] as List<InvitationModel>,
           applicants: results[1] as List<ApplicantModel>,
+          myApplications: results[3] as List<MyApplicationModel>,
         ),
       );
+      _startRealtimeStreams();
     } catch (_) {
       if (!isClosed) {
         emit(MyProjectsError('Something went wrong, please try again'));
       }
     }
+  }
+
+  // Subscribe to real-time Firestore streams for owned projects, invitations, and applicants.
+  void _startRealtimeStreams() {
+    _cancelStreams();
+
+    _ownedSub = repo.watchOwnedProjects().listen((owned) {
+      Timer.run(() {
+        final s = state;
+        if (isClosed || s is! MyProjectsLoaded) return;
+        final joined = s.projects.where((p) => !p.isOwner).toList();
+        final ownedIds = owned.map((p) => p.id).toSet();
+        final merged = [
+          ...owned,
+          ...joined.where((p) => !ownedIds.contains(p.id)),
+        ];
+        emit(
+          MyProjectsLoaded(
+            projects: merged,
+            invitations: s.invitations,
+            applicants: s.applicants,
+            myApplications: s.myApplications,
+            sentInvitations: s.sentInvitations,
+          ),
+        );
+      });
+    }, onError: (_) {});
+
+    _joinedSub = repo.watchJoinedProjects().listen((joined) {
+      Timer.run(() {
+        final s = state;
+        if (isClosed || s is! MyProjectsLoaded) return;
+        final owned = s.projects.where((p) => p.isOwner).toList();
+        final ownedIds = owned.map((p) => p.id).toSet();
+        final merged = [
+          ...owned,
+          ...joined.where((p) => !ownedIds.contains(p.id)),
+        ];
+        emit(
+          MyProjectsLoaded(
+            projects: merged,
+            invitations: s.invitations,
+            applicants: s.applicants,
+            myApplications: s.myApplications,
+            sentInvitations: s.sentInvitations,
+          ),
+        );
+      });
+    }, onError: (_) {});
+
+    _invitesSub = repo.watchInvitations().listen((invites) {
+      Timer.run(() {
+        final s = state;
+        if (isClosed || s is! MyProjectsLoaded) return;
+        emit(
+          MyProjectsLoaded(
+            projects: s.projects,
+            invitations: invites,
+            applicants: s.applicants,
+            myApplications: s.myApplications,
+            sentInvitations: s.sentInvitations,
+          ),
+        );
+      });
+    }, onError: (_) {});
+
+    _applicantsSub = repo.watchIncomingApplicants().listen((applicants) {
+      Timer.run(() {
+        final s = state;
+        if (isClosed || s is! MyProjectsLoaded) return;
+        emit(
+          MyProjectsLoaded(
+            projects: s.projects,
+            invitations: s.invitations,
+            applicants: applicants,
+            myApplications: s.myApplications,
+            sentInvitations: s.sentInvitations,
+          ),
+        );
+      });
+    }, onError: (_) {});
+
+    _myAppsSub = repo.watchMyApplications().listen((apps) {
+      Timer.run(() {
+        final s = state;
+        if (isClosed || s is! MyProjectsLoaded) return;
+        emit(
+          MyProjectsLoaded(
+            projects: s.projects,
+            invitations: s.invitations,
+            applicants: s.applicants,
+            myApplications: apps,
+            sentInvitations: s.sentInvitations,
+          ),
+        );
+      });
+    }, onError: (_) {});
+  }
+
+  // Withdraw a pending outgoing application.
+  Future<void> withdrawApplication(MyApplicationModel app) async {
+    final s = state;
+    if (s is! MyProjectsLoaded) return;
+    final next = s.myApplications.where((a) => a.id != app.id).toList();
+    emit(
+      MyProjectsLoaded(
+        projects: s.projects,
+        invitations: s.invitations,
+        applicants: s.applicants,
+        myApplications: next,
+        sentInvitations: s.sentInvitations,
+        message: 'Application withdrawn',
+      ),
+    );
+    await repo.withdrawApplication(app.id);
+  }
+
+  void _cancelStreams() {
+    _ownedSub?.cancel();
+    _ownedSub = null;
+    _joinedSub?.cancel();
+    _joinedSub = null;
+    _invitesSub?.cancel();
+    _invitesSub = null;
+    _applicantsSub?.cancel();
+    _applicantsSub = null;
+    _myAppsSub?.cancel();
+    _myAppsSub = null;
   }
 
   // Update editable project details (title, description, seats, tags, open roles).
@@ -152,8 +295,9 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
 
     final invitation = s.invitations.where((i) => i.id == id).firstOrNull;
     if (invitation == null) return;
-    invitation.status =
-        accept ? InvitationStatus.accepted : InvitationStatus.declined;
+    invitation.status = accept
+        ? InvitationStatus.accepted
+        : InvitationStatus.declined;
 
     if (accept) {
       s.projects.add(
@@ -174,10 +318,7 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
     }
 
     emit(
-      _copy(
-        s,
-        message: accept ? 'Invitation accepted' : 'Invitation declined',
-      ),
+      _copy(s, message: accept ? 'Invitation accepted' : 'Invitation declined'),
     );
     await repo.respondToInvitation(invitation, accept);
     if (accept) {
@@ -192,13 +333,15 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
 
     final applicant = s.applicants.where((a) => a.id == id).firstOrNull;
     if (applicant == null) return;
-    applicant.status =
-        accept ? ApplicantStatus.accepted : ApplicantStatus.declined;
+    applicant.status = accept
+        ? ApplicantStatus.accepted
+        : ApplicantStatus.declined;
 
     int? updatedCount;
     if (accept && applicant.projectId.isNotEmpty) {
-      final project =
-          s.projects.where((p) => p.id == applicant.projectId).firstOrNull;
+      final project = s.projects
+          .where((p) => p.id == applicant.projectId)
+          .firstOrNull;
       if (project != null) {
         if (project.membersCount < project.totalSeats) {
           project.membersCount += 1;
@@ -221,8 +364,8 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
           : applicant.id;
       final handle = applicant.username.isNotEmpty
           ? (applicant.username.startsWith('@')
-              ? applicant.username
-              : '@${applicant.username}')
+                ? applicant.username
+                : '@${applicant.username}')
           : '@${applicant.name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '')}';
       _teamsController?.syncMemberAdded(
         teamId: applicant.projectId,
@@ -276,7 +419,7 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
     );
   }
 
-  // Publish a saved draft project to Ongoing.
+  // Publish a saved draft project to Ongoing and initialize its Team Workspace.
   Future<void> publishDraft(String id) async {
     final s = state;
     if (s is! MyProjectsLoaded) return;
@@ -287,7 +430,14 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
     project.statusText = 'Active • Open';
 
     emit(_copy(s, message: '"${project.name}" published to Ongoing'));
-    await repo.publishDraft(id);
+    await repo.publishDraft(project);
+    await _teamsController?.loadData(force: true);
+  }
+
+  // Ensure a Team Workspace exists for an ongoing project before opening it.
+  Future<void> ensureTeamWorkspace(ProjectModel project) async {
+    await repo.ensureTeamWorkspace(project);
+    await _teamsController?.loadData(force: true);
   }
 
   // Delete a saved draft project.
@@ -331,10 +481,17 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
     await repo.setProjectArchived(id, false);
   }
 
-  // Reset state when signing out.
+  // Reset state and cancel real-time streams when signing out.
   void reset() {
+    _cancelStreams();
     developers = [];
     emit(MyProjectsInitial());
+  }
+
+  @override
+  Future<void> close() {
+    _cancelStreams();
+    return super.close();
   }
 
   MyProjectsLoaded _copy(
@@ -346,6 +503,7 @@ class MyProjectsCubit extends Cubit<MyProjectsState> {
       projects: List<ProjectModel>.from(s.projects),
       invitations: List<InvitationModel>.from(s.invitations),
       applicants: List<ApplicantModel>.from(s.applicants),
+      myApplications: List<MyApplicationModel>.from(s.myApplications),
       sentInvitations: sentInvitations ?? s.sentInvitations,
       message: message,
     );

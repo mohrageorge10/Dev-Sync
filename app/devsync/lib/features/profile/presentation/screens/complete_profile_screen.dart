@@ -89,6 +89,18 @@ class CompleteProfileScreen extends StatelessWidget {
               Navigator.pushNamed(context, _targets[first]!);
             },
           ),
+          if (profile.isCoreProfileComplete) ...[
+            const SizedBox(height: 14),
+            ProfilePrimaryButton(
+              'Continue to DevSync',
+              icon: Icons.arrow_forward_rounded,
+              onPressed: () => Navigator.pushNamedAndRemoveUntil(
+                context,
+                AppRoutes.main,
+                (_) => false,
+              ),
+            ),
+          ],
           if (!done) ...[
             const SizedBox(height: 12),
             Center(

@@ -2,10 +2,8 @@ import 'dart:async';
 
 import 'package:devsync/core/di/service_locator.dart';
 import 'package:devsync/features/discover_project/data/model/developer_model.dart';
-import 'package:devsync/features/discover_project/data/model/developers_data.dart';
 import 'package:devsync/features/discover_project/data/model/filter_state.dart';
 import 'package:devsync/features/discover_project/data/model/project_model.dart';
-import 'package:devsync/features/discover_project/data/model/projects_data.dart';
 import 'package:devsync/features/discover_project/data/repositories/discover_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -22,8 +20,8 @@ class DiscoverCubit extends Cubit<DiscoverState> {
         super(
           DiscoverState(
             tab: initialTab,
-            allProjects: projectsData,
-            allDevelopers: developersData,
+            allProjects: const [],
+            allDevelopers: const [],
           ),
         ) {
     loadData();
@@ -33,6 +31,10 @@ class DiscoverCubit extends Cubit<DiscoverState> {
   final TextEditingController searchController = TextEditingController();
   Timer? _debounce;
   Timer? _guestDebounce;
+  StreamSubscription<List<ProjectModel>>? _projectsSub;
+  StreamSubscription<List<DeveloperModel>>? _devsSub;
+  StreamSubscription<Set<String>>? _savedSub;
+  StreamSubscription<Set<String>>? _appliedSub;
 
   // Load user summary, projects, developers, and saved IDs from Firestore.
   Future<void> loadData() async {
@@ -79,13 +81,61 @@ class DiscoverCubit extends Cubit<DiscoverState> {
           invitedDeveloperIds: invited,
         ),
       );
+      _startRealtimeStreams();
     } catch (_) {
       if (!isClosed) emit(state.copyWith(isLoading: false));
     }
   }
 
-  // Reset user-scoped state on sign-out.
+  // Subscribe to real-time Firestore streams for projects, developers, saved, and requests.
+  void _startRealtimeStreams() {
+    final repo = _repo;
+    if (repo == null) return;
+    _cancelStreams();
+
+    _projectsSub = repo.watchProjects().listen((projects) {
+      Timer.run(() {
+        if (isClosed) return;
+        emit(state.copyWith(allProjects: projects));
+      });
+    }, onError: (_) {});
+
+    _devsSub = repo.watchDevelopers().listen((devs) {
+      Timer.run(() {
+        if (isClosed) return;
+        emit(state.copyWith(allDevelopers: devs));
+      });
+    }, onError: (_) {});
+
+    _savedSub = repo.watchSavedIds().listen((saved) {
+      Timer.run(() {
+        if (isClosed) return;
+        emit(state.copyWith(savedProjectIds: saved, savedDeveloperIds: saved));
+      });
+    }, onError: (_) {});
+
+    _appliedSub = repo.watchAppliedProjectIds().listen((applied) {
+      Timer.run(() {
+        if (isClosed) return;
+        emit(state.copyWith(appliedProjectIds: applied));
+      });
+    }, onError: (_) {});
+  }
+
+  void _cancelStreams() {
+    _projectsSub?.cancel();
+    _projectsSub = null;
+    _devsSub?.cancel();
+    _devsSub = null;
+    _savedSub?.cancel();
+    _savedSub = null;
+    _appliedSub?.cancel();
+    _appliedSub = null;
+  }
+
+  // Reset user-scoped state and cancel real-time streams on sign-out.
   void reset() {
+    _cancelStreams();
     _debounce?.cancel();
     _guestDebounce?.cancel();
     searchController.clear();
@@ -192,6 +242,7 @@ class DiscoverCubit extends Cubit<DiscoverState> {
 
   @override
   Future<void> close() {
+    _cancelStreams();
     _debounce?.cancel();
     _guestDebounce?.cancel();
     searchController.dispose();

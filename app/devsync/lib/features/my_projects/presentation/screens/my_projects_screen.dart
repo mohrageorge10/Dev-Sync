@@ -1,19 +1,23 @@
 import 'package:devsync/core/animations/app_page_route.dart';
+import 'package:devsync/core/di/service_locator.dart';
+import 'package:devsync/core/routing/app_router.dart';
 import 'package:devsync/core/routing/app_routes.dart';
 import 'package:devsync/core/shared/app_bar/custom_app_bar.dart';
 import 'package:devsync/core/shared/app_bar/devsync_logo.dart';
 import 'package:devsync/core/shared/feedback/app_feedback.dart';
 import 'package:devsync/core/theme/app_colors.dart';
 import 'package:devsync/core/theme/app_styles.dart';
+import 'package:devsync/features/my_teams/data/app_state.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../cubit/my_projects_cubit.dart';
 import '../widgets/app_button.dart';
+import '../widgets/my_projects_screen/applied_tab_view.dart';
 import '../widgets/my_projects_screen/drafted_project_card.dart';
 import '../widgets/my_projects_screen/empty_view.dart';
 import '../widgets/my_projects_screen/invited_project_card.dart';
-import '../widgets/my_projects_screen/ongoing_project_card.dart';
+import '../widgets/my_projects_screen/ongoing_tab_view.dart';
 import '../widgets/my_projects_screen/previous_project_card.dart';
 import 'invitation_details_screen.dart';
 import 'project_overview_screen.dart';
@@ -75,7 +79,7 @@ class MyProjectsScreen extends StatelessWidget {
     final c = context.colors;
 
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Scaffold(
         backgroundColor: c.backgroundPrimary,
         appBar: CustomAppBar(
@@ -154,22 +158,54 @@ class MyProjectsScreen extends StatelessWidget {
                   unselectedLabelStyle: AppStyles.body12Medium(context),
                   tabs: [
                     Tab(text: 'Ongoing (${data.ongoing.length})'),
-                    Tab(text: 'Drafted (${data.drafted.length})'),
+                    Tab(text: 'Applied (${data.myApplications.length})'),
                     Tab(text: 'Invited (${data.pendingInvitations.length})'),
+                    Tab(text: 'Drafted (${data.drafted.length})'),
                     Tab(text: 'Previous (${data.previous.length})'),
                   ],
                 ),
                 Expanded(
                   child: TabBarView(
                     children: [
+                      OngoingTabView(
+                        projects: data.ongoing,
+                        onRefresh: cubit.loadData,
+                        onTapProject: (p) => _pushWithCubit(
+                          context,
+                          ProjectOverviewScreen(project: p),
+                        ),
+                      ),
+                      AppliedTabView(
+                        applications: data.myApplications,
+                        onRefresh: cubit.loadData,
+                        onWithdraw: cubit.withdrawApplication,
+                        onOpenWorkspace: (app) {
+                          if (ServiceLocator.isRegistered<TeamsController>()) {
+                            final team = ServiceLocator.get<TeamsController>()
+                                .teams
+                                .where(
+                                  (t) =>
+                                      t.id == app.projectId ||
+                                      t.name.toLowerCase() ==
+                                          app.projectTitle.toLowerCase(),
+                                )
+                                .firstOrNull;
+                            if (team != null) {
+                              AppRouter.toWorkspace(context, team);
+                              return;
+                            }
+                          }
+                          Navigator.of(context).pushNamed(AppRoutes.myTeams);
+                        },
+                      ),
                       RefreshIndicator(
                         onRefresh: cubit.loadData,
-                        child: data.ongoing.isEmpty
+                        child: pendingInvitations.isEmpty
                             ? ListView(
                                 physics: const AlwaysScrollableScrollPhysics(),
                                 children: const [
                                   SizedBox(height: 120),
-                                  EmptyView('No ongoing projects'),
+                                  EmptyView('No pending invitations'),
                                 ],
                               )
                             : ListView(
@@ -180,13 +216,15 @@ class MyProjectsScreen extends StatelessWidget {
                                   16,
                                   96,
                                 ),
-                                children: data.ongoing
+                                children: pendingInvitations
                                     .map(
-                                      (p) => OngoingProjectCard(
-                                        project: p,
-                                        onTap: () => _pushWithCubit(
+                                      (i) => InvitedProjectCard(
+                                        invitation: i,
+                                        onView: () => _pushWithCubit(
                                           context,
-                                          ProjectOverviewScreen(project: p),
+                                          InvitationDetailsScreen(
+                                            invitation: i,
+                                          ),
                                         ),
                                       ),
                                     )
@@ -226,39 +264,6 @@ class MyProjectsScreen extends StatelessWidget {
                                           cubit,
                                           p.id,
                                           p.name,
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                              ),
-                      ),
-                      RefreshIndicator(
-                        onRefresh: cubit.loadData,
-                        child: pendingInvitations.isEmpty
-                            ? ListView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                children: const [
-                                  SizedBox(height: 120),
-                                  EmptyView('No pending invitations'),
-                                ],
-                              )
-                            : ListView(
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                padding: const EdgeInsets.fromLTRB(
-                                  16,
-                                  16,
-                                  16,
-                                  96,
-                                ),
-                                children: pendingInvitations
-                                    .map(
-                                      (i) => InvitedProjectCard(
-                                        invitation: i,
-                                        onView: () => _pushWithCubit(
-                                          context,
-                                          InvitationDetailsScreen(
-                                            invitation: i,
-                                          ),
                                         ),
                                       ),
                                     )

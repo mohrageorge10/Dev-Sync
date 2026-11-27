@@ -612,6 +612,16 @@ class ProfileController extends ChangeNotifier {
   int get completedItems => checklist.where((e) => e.done).length;
   int get completion => (completedItems * 100 / checklist.length).round();
 
+  // Mandatory core profile gate required before entering the main app.
+  bool get isCoreProfileComplete =>
+      displayName.trim().length >= 2 &&
+      username.trim().length >= 3 &&
+      track != null &&
+      track!.trim().isNotEmpty &&
+      level != null &&
+      level!.trim().isNotEmpty &&
+      allSkills.isNotEmpty;
+
   List<String> get allSkills => {
     if (subTrack != null && subTrack!.isNotEmpty) subTrack!,
     ...languages.keys,

@@ -7,6 +7,7 @@ import 'package:devsync/features/discover_project/data/model/developer_model.dar
 import '../models/applicant_model.dart';
 import '../models/developer_model.dart';
 import '../models/invitation_model.dart';
+import '../models/my_application_model.dart';
 import '../models/project_model.dart';
 
 // Firestore-backed repository for My Projects with local showcase fallback.
@@ -56,13 +57,72 @@ class MyProjectsRepo {
           }
         }
 
-        if (byId.isNotEmpty) return byId.values.toList();
+        // Also include projects where this user's join request was accepted.
+        final acceptedReqs = await fs.getCollection(
+          collectionPath: FirebaseConstants.requestsCollection,
+          queryBuilder: (q) => q
+              .where(FirebaseConstants.fieldApplicantId, isEqualTo: uid)
+              .where(FirebaseConstants.fieldStatus, isEqualTo: 'accepted'),
+        );
+        for (final req in acceptedReqs) {
+          final pid = (req[FirebaseConstants.fieldProjectId] ?? '').toString();
+          if (pid.isEmpty || byId.containsKey(pid)) continue;
+          final pDoc = await fs.getDocument(
+            collectionPath: FirebaseConstants.projectsCollection,
+            docId: pid,
+          );
+          if (pDoc != null) {
+            byId[pid] = _projectFromDoc({...pDoc, 'id': pid}, uid);
+            // Ensure user is listed in teams/{pid}.memberIds and teams/{pid}/members/{uid}.
+            final userDoc = await fs.getDocument(
+              collectionPath: FirebaseConstants.usersCollection,
+              docId: uid,
+            );
+            final name = (userDoc?[FirebaseConstants.fieldName] ??
+                    _auth?.currentUser?.displayName ??
+                    'Developer')
+                .toString();
+            final handle = (userDoc?[FirebaseConstants.fieldPublicId] ??
+                    name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), ''))
+                .toString();
+            final track = (req[FirebaseConstants.fieldTrack] ??
+                    userDoc?[FirebaseConstants.fieldTrack] ??
+                    'Member')
+                .toString();
+            await fs.setDocument(
+              collectionPath:
+                  '${FirebaseConstants.teamsCollection}/$pid/${FirebaseConstants.membersCollection}',
+              docId: uid,
+              data: {
+                FirebaseConstants.fieldUid: uid,
+                FirebaseConstants.fieldName: name,
+                'username': handle,
+                FirebaseConstants.fieldTrack: track,
+                'teamRole': 'member',
+                FirebaseConstants.fieldIsOwner: false,
+                FirebaseConstants.fieldJoinedAt: fs.serverTimestamp,
+              },
+              merge: true,
+            );
+            await fs.setDocument(
+              collectionPath: FirebaseConstants.teamsCollection,
+              docId: pid,
+              data: {
+                FirebaseConstants.fieldProjectId: pid,
+                FirebaseConstants.fieldMemberIds: FieldValue.arrayUnion([uid]),
+              },
+              merge: true,
+            );
+          }
+        }
+
+        return byId.values.toList();
       } catch (_) {}
     }
-    return _fallbackProjects();
+    return const [];
   }
 
-  // Fetch incoming project invitations for the current user.
+  // Fetch incoming project invitations for the current user (ignoring deleted projects).
   Future<List<InvitationModel>> getInvitations() async {
     final uid = _auth?.currentUserId;
     final fs = _firestore;
@@ -73,37 +133,102 @@ class MyProjectsRepo {
           queryBuilder: (q) =>
               q.where(FirebaseConstants.fieldInviteeId, isEqualTo: uid),
         );
-        if (docs.isNotEmpty) {
-          return docs.map(_invitationFromDoc).toList();
+        final valid = <InvitationModel>[];
+        for (final d in docs) {
+          final inv = _invitationFromDoc(d);
+          if (await _projectExists(fs, inv.projectId)) valid.add(inv);
         }
+        return valid;
       } catch (_) {}
     }
-    return _fallbackInvitations();
+    return const [];
   }
 
-  // Fetch incoming join requests across the user's owned projects.
+  // Fetch incoming join requests across the user's owned projects (real Firestore data only).
   Future<List<ApplicantModel>> getApplicants({
     List<String> ownedProjectIds = const [],
   }) async {
     final fs = _firestore;
-    if (fs != null && ownedProjectIds.isNotEmpty) {
+    final uid = _auth?.currentUserId;
+    if (fs != null && uid != null) {
       try {
-        final results = <ApplicantModel>[];
-        for (final pid in ownedProjectIds.take(10)) {
-          final docs = await fs.getCollection(
-            collectionPath: FirebaseConstants.requestsCollection,
-            queryBuilder: (q) =>
-                q.where(FirebaseConstants.fieldProjectId, isEqualTo: pid),
-          );
-          results.addAll(docs.map(_applicantFromDoc));
-        }
-        if (results.isNotEmpty) return results;
+        final docs = await fs.getCollection(
+          collectionPath: FirebaseConstants.requestsCollection,
+          queryBuilder: (q) =>
+              q.where(FirebaseConstants.fieldOwnerId, isEqualTo: uid),
+        );
+        return docs.map(_applicantFromDoc).toList();
       } catch (_) {}
     }
-    return _fallbackApplicants();
+    return const [];
   }
 
-  // Fetch recommended developers to invite.
+  // Fetch outgoing join requests submitted by the current user (ignoring deleted projects).
+  Future<List<MyApplicationModel>> getMyApplications() async {
+    final uid = _auth?.currentUserId;
+    final fs = _firestore;
+    if (uid != null && fs != null) {
+      try {
+        final docs = await fs.getCollection(
+          collectionPath: FirebaseConstants.requestsCollection,
+          queryBuilder: (q) =>
+              q.where(FirebaseConstants.fieldApplicantId, isEqualTo: uid),
+        );
+        final valid = <MyApplicationModel>[];
+        for (final d in docs) {
+          final app = _myApplicationFromDoc(d);
+          if (await _projectExists(fs, app.projectId)) valid.add(app);
+        }
+        return valid;
+      } catch (_) {}
+    }
+    return const [];
+  }
+
+  // Real-time stream of outgoing join requests submitted by the current user (ignoring deleted projects).
+  Stream<List<MyApplicationModel>> watchMyApplications() {
+    final uid = _auth?.currentUserId;
+    final fs = _firestore;
+    if (uid == null || fs == null) return const Stream.empty();
+    return fs
+        .collectionStream(
+          collectionPath: FirebaseConstants.requestsCollection,
+          queryBuilder: (q) =>
+              q.where(FirebaseConstants.fieldApplicantId, isEqualTo: uid),
+        )
+        .asyncMap((docs) async {
+          final valid = <MyApplicationModel>[];
+          for (final d in docs) {
+            final app = _myApplicationFromDoc(d);
+            if (await _projectExists(fs, app.projectId)) valid.add(app);
+          }
+          return valid;
+        });
+  }
+
+  // Check whether a referenced project document still exists in Firestore.
+  Future<bool> _projectExists(FirestoreService fs, String projectId) async {
+    if (projectId.isEmpty) return false;
+    final doc = await fs.getDocument(
+      collectionPath: FirebaseConstants.projectsCollection,
+      docId: projectId,
+    );
+    return doc != null;
+  }
+
+  // Withdraw a pending outgoing application.
+  Future<void> withdrawApplication(String requestId) async {
+    final fs = _firestore;
+    if (fs == null || requestId.isEmpty) return;
+    try {
+      await fs.deleteDocument(
+        collectionPath: FirebaseConstants.requestsCollection,
+        docId: requestId,
+      );
+    } catch (_) {}
+  }
+
+  // Fetch recommended developers to invite (real Firestore data only).
   Future<List<DeveloperModel>> getDevelopers() async {
     final uid = _auth?.currentUserId;
     final fs = _firestore;
@@ -112,15 +237,101 @@ class MyProjectsRepo {
         final docs = await fs.getCollection(
           collectionPath: FirebaseConstants.usersCollection,
         );
-        final mapped = docs
+        return docs
             .where((d) => (d['id'] ?? d[FirebaseConstants.fieldUid]) != uid)
-            .take(10)
+            .take(15)
             .map(_developerFromDoc)
             .toList();
-        if (mapped.isNotEmpty) return mapped;
       } catch (_) {}
     }
-    return _fallbackDevelopers();
+    return const [];
+  }
+
+  // Real-time stream of projects owned by the current user.
+  Stream<List<ProjectModel>> watchOwnedProjects() {
+    final uid = _auth?.currentUserId;
+    final fs = _firestore;
+    if (uid == null || fs == null) return const Stream.empty();
+    return fs
+        .collectionStream(
+          collectionPath: FirebaseConstants.projectsCollection,
+          queryBuilder: (q) =>
+              q.where(FirebaseConstants.fieldOwnerId, isEqualTo: uid),
+        )
+        .map((docs) => docs.map((d) => _projectFromDoc(d, uid)).toList());
+  }
+
+  // Real-time stream of projects joined by the current user via teams/{projectId}.
+  Stream<List<ProjectModel>> watchJoinedProjects() {
+    final uid = _auth?.currentUserId;
+    final fs = _firestore;
+    if (uid == null || fs == null) return const Stream.empty();
+    return fs
+        .collectionStream(
+          collectionPath: FirebaseConstants.teamsCollection,
+          queryBuilder: (q) =>
+              q.where(FirebaseConstants.fieldMemberIds, arrayContains: uid),
+        )
+        .asyncMap((teamDocs) async {
+          final joined = <ProjectModel>[];
+          for (final tDoc in teamDocs) {
+            final pid =
+                (tDoc[FirebaseConstants.fieldProjectId] ?? tDoc['id'] ?? '')
+                    .toString();
+            if (pid.isEmpty) continue;
+            final pDoc = await fs.getDocument(
+              collectionPath: FirebaseConstants.projectsCollection,
+              docId: pid,
+            );
+            if (pDoc != null) {
+              final model = _projectFromDoc({...pDoc, 'id': pid}, uid);
+              if (!model.isOwner) joined.add(model);
+            }
+          }
+          return joined;
+        });
+  }
+
+  // Real-time stream of incoming project invitations (ignoring deleted projects).
+  Stream<List<InvitationModel>> watchInvitations() {
+    final uid = _auth?.currentUserId;
+    final fs = _firestore;
+    if (uid == null || fs == null) return const Stream.empty();
+    return fs
+        .collectionStream(
+          collectionPath: FirebaseConstants.invitationsCollection,
+          queryBuilder: (q) =>
+              q.where(FirebaseConstants.fieldInviteeId, isEqualTo: uid),
+        )
+        .asyncMap((docs) async {
+          final valid = <InvitationModel>[];
+          for (final d in docs) {
+            final inv = _invitationFromDoc(d);
+            if (inv.projectId.isNotEmpty) {
+              final exists = await fs.getDocument(
+                collectionPath: FirebaseConstants.projectsCollection,
+                docId: inv.projectId,
+              );
+              if (exists == null) continue;
+            }
+            valid.add(inv);
+          }
+          return valid;
+        });
+  }
+
+  // Real-time stream of incoming join requests for projects owned by the current user.
+  Stream<List<ApplicantModel>> watchIncomingApplicants() {
+    final uid = _auth?.currentUserId;
+    final fs = _firestore;
+    if (uid == null || fs == null) return const Stream.empty();
+    return fs
+        .collectionStream(
+          collectionPath: FirebaseConstants.requestsCollection,
+          queryBuilder: (q) =>
+              q.where(FirebaseConstants.fieldOwnerId, isEqualTo: uid),
+        )
+        .map((docs) => docs.map(_applicantFromDoc).toList());
   }
 
   // Resolve full developer profile for an applicant (Firestore first, local fallback).
@@ -311,14 +522,16 @@ class MyProjectsRepo {
       );
       if (accept && applicant.projectId.isNotEmpty) {
         if (updatedMembersCount != null) {
-          await fs.updateDocument(
-            collectionPath: FirebaseConstants.projectsCollection,
-            docId: applicant.projectId,
-            data: {
-              FirebaseConstants.fieldFilledCount: updatedMembersCount,
-              FirebaseConstants.fieldUpdatedAt: fs.serverTimestamp,
-            },
-          );
+          try {
+            await fs.updateDocument(
+              collectionPath: FirebaseConstants.projectsCollection,
+              docId: applicant.projectId,
+              data: {
+                FirebaseConstants.fieldFilledCount: updatedMembersCount,
+                FirebaseConstants.fieldUpdatedAt: fs.serverTimestamp,
+              },
+            );
+          } catch (_) {}
         }
         final memberUid = applicant.applicantUid.isNotEmpty
             ? applicant.applicantUid
@@ -326,32 +539,36 @@ class MyProjectsRepo {
         final handle = applicant.username.isNotEmpty
             ? applicant.username
             : applicant.name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
-        await fs.setDocument(
-          collectionPath:
-              '${FirebaseConstants.teamsCollection}/${applicant.projectId}/${FirebaseConstants.membersCollection}',
-          docId: memberUid,
-          data: {
-            FirebaseConstants.fieldUid: memberUid,
-            FirebaseConstants.fieldName: applicant.name,
-            'username': handle,
-            FirebaseConstants.fieldTrack: applicant.position,
-            'teamRole': 'member',
-            FirebaseConstants.fieldIsOwner: false,
-            FirebaseConstants.fieldJoinedAt: fs.serverTimestamp,
-          },
-          merge: true,
-        );
-        await fs.setDocument(
-          collectionPath: FirebaseConstants.teamsCollection,
-          docId: applicant.projectId,
-          data: {
-            FirebaseConstants.fieldMemberIds: FieldValue.arrayUnion([
-              memberUid,
-            ]),
-            FirebaseConstants.fieldUpdatedAt: fs.serverTimestamp,
-          },
-          merge: true,
-        );
+        try {
+          await fs.setDocument(
+            collectionPath:
+                '${FirebaseConstants.teamsCollection}/${applicant.projectId}/${FirebaseConstants.membersCollection}',
+            docId: memberUid,
+            data: {
+              FirebaseConstants.fieldUid: memberUid,
+              FirebaseConstants.fieldName: applicant.name,
+              'username': handle,
+              FirebaseConstants.fieldTrack: applicant.position,
+              'teamRole': 'member',
+              FirebaseConstants.fieldIsOwner: false,
+              FirebaseConstants.fieldJoinedAt: fs.serverTimestamp,
+            },
+            merge: true,
+          );
+        } catch (_) {}
+        try {
+          await fs.setDocument(
+            collectionPath: FirebaseConstants.teamsCollection,
+            docId: applicant.projectId,
+            data: {
+              FirebaseConstants.fieldMemberIds: FieldValue.arrayUnion([
+                memberUid,
+              ]),
+              FirebaseConstants.fieldUpdatedAt: fs.serverTimestamp,
+            },
+            merge: true,
+          );
+        } catch (_) {}
       }
     } catch (_) {}
   }
@@ -384,24 +601,93 @@ class MyProjectsRepo {
     } catch (_) {}
   }
 
-  // Publish a saved draft project (draft -> open).
-  Future<void> publishDraft(String projectId) async {
+  // Publish a saved draft project (draft -> open) and initialize its teams/{projectId} workspace.
+  Future<void> publishDraft(ProjectModel project) async {
     final fs = _firestore;
+    final uid = _auth?.currentUserId;
     if (fs == null) return;
     try {
       await fs.updateDocument(
         collectionPath: FirebaseConstants.projectsCollection,
-        docId: projectId,
+        docId: project.id,
         data: {
           FirebaseConstants.fieldStatus: 'open',
           FirebaseConstants.fieldPublishedAt: fs.serverTimestamp,
           FirebaseConstants.fieldUpdatedAt: fs.serverTimestamp,
         },
       );
+      if (uid != null) {
+        await ensureTeamWorkspace(project);
+      }
     } catch (_) {}
   }
 
-  // Delete a draft project from Firestore.
+  // Ensure teams/{project.id} and owner member doc exist in Firestore.
+  Future<void> ensureTeamWorkspace(ProjectModel project) async {
+    final fs = _firestore;
+    final uid = _auth?.currentUserId;
+    if (fs == null || uid == null || project.id.isEmpty) return;
+    try {
+      final existingTeam = await fs.getDocument(
+        collectionPath: FirebaseConstants.teamsCollection,
+        docId: project.id,
+      );
+      if (existingTeam != null) return;
+
+      final userDoc = await fs.getDocument(
+        collectionPath: FirebaseConstants.usersCollection,
+        docId: uid,
+      );
+      final name =
+          (userDoc?[FirebaseConstants.fieldName] ??
+                  _auth?.currentUser?.displayName ??
+                  'Project Owner')
+              .toString();
+      final username =
+          (userDoc?['username'] ??
+                  userDoc?[FirebaseConstants.fieldPublicId] ??
+                  name.toLowerCase().replaceAll(' ', ''))
+              .toString();
+      final track = (userDoc?[FirebaseConstants.fieldTrack] ?? 'Project Lead')
+          .toString();
+
+      await fs.setDocument(
+        collectionPath: FirebaseConstants.teamsCollection,
+        docId: project.id,
+        data: {
+          FirebaseConstants.fieldProjectId: project.id,
+          FirebaseConstants.fieldProjectTitle: project.name,
+          FirebaseConstants.fieldOwnerId: uid,
+          FirebaseConstants.fieldMemberIds: [uid],
+          FirebaseConstants.fieldTeamSize: project.totalSeats,
+          FirebaseConstants.fieldOpenTrackKeys: project.openRoles,
+          'repoUrl': project.repoUrl,
+          'sprint': 'Sprint 1',
+          'version': 'v1.0.0',
+          FirebaseConstants.fieldCreatedAt: fs.serverTimestamp,
+          FirebaseConstants.fieldUpdatedAt: fs.serverTimestamp,
+        },
+        merge: true,
+      );
+      await fs.setDocument(
+        collectionPath:
+            '${FirebaseConstants.teamsCollection}/${project.id}/${FirebaseConstants.membersCollection}',
+        docId: uid,
+        data: {
+          FirebaseConstants.fieldUid: uid,
+          FirebaseConstants.fieldName: name,
+          'username': username,
+          FirebaseConstants.fieldTrack: track,
+          'teamRole': 'owner',
+          FirebaseConstants.fieldIsOwner: true,
+          FirebaseConstants.fieldJoinedAt: fs.serverTimestamp,
+        },
+        merge: true,
+      );
+    } catch (_) {}
+  }
+
+  // Delete a project and clean up its orphan invitations and join requests.
   Future<void> deleteProject(String projectId) async {
     final fs = _firestore;
     if (fs == null) return;
@@ -410,6 +696,34 @@ class MyProjectsRepo {
         collectionPath: FirebaseConstants.projectsCollection,
         docId: projectId,
       );
+      final invDocs = await fs.getCollection(
+        collectionPath: FirebaseConstants.invitationsCollection,
+        queryBuilder: (q) =>
+            q.where(FirebaseConstants.fieldProjectId, isEqualTo: projectId),
+      );
+      for (final d in invDocs) {
+        final id = (d['id'] ?? '').toString();
+        if (id.isNotEmpty) {
+          await fs.deleteDocument(
+            collectionPath: FirebaseConstants.invitationsCollection,
+            docId: id,
+          );
+        }
+      }
+      final reqDocs = await fs.getCollection(
+        collectionPath: FirebaseConstants.requestsCollection,
+        queryBuilder: (q) =>
+            q.where(FirebaseConstants.fieldProjectId, isEqualTo: projectId),
+      );
+      for (final d in reqDocs) {
+        final id = (d['id'] ?? '').toString();
+        if (id.isNotEmpty) {
+          await fs.deleteDocument(
+            collectionPath: FirebaseConstants.requestsCollection,
+            docId: id,
+          );
+        }
+      }
     } catch (_) {}
   }
 
@@ -441,9 +755,15 @@ class MyProjectsRepo {
     final cloneUrl = (d['cloneUrl'] ?? ProjectModel.deriveCloneUrl(repoUrl))
         .toString();
     final rawRules = d['gitRules'];
+    final id = (d['id'] ?? '').toString();
+    final rawCode = (d['projectCode'] ?? '').toString().trim();
+    final projectCode = rawCode.isNotEmpty
+        ? rawCode
+        : (id.length >= 5 ? 'PRJ-${id.substring(0, 5).toUpperCase()}' : 'PRJ-$id');
 
     return ProjectModel(
-      id: (d['id'] ?? '').toString(),
+      id: id,
+      projectCode: projectCode,
       name: (d[FirebaseConstants.fieldTitle] ?? 'Untitled Project').toString(),
       description: (d[FirebaseConstants.fieldDescription] ?? '').toString(),
       statusText: isDraft
@@ -507,6 +827,33 @@ class MyProjectsRepo {
     );
   }
 
+  MyApplicationModel _myApplicationFromDoc(Map<String, dynamic> d) {
+    final rawStatus = (d[FirebaseConstants.fieldStatus] ?? 'pending')
+        .toString()
+        .toLowerCase();
+    final status = switch (rawStatus) {
+      'accepted' => ApplicationStatus.accepted,
+      'declined' || 'rejected' => ApplicationStatus.declined,
+      _ => ApplicationStatus.pending,
+    };
+    final rawCreated = d[FirebaseConstants.fieldCreatedAt];
+    DateTime? createdAt;
+    if (rawCreated is Timestamp) {
+      createdAt = rawCreated.toDate();
+    } else if (rawCreated is String) {
+      createdAt = DateTime.tryParse(rawCreated);
+    }
+    return MyApplicationModel(
+      id: (d['id'] ?? '').toString(),
+      projectId: (d[FirebaseConstants.fieldProjectId] ?? '').toString(),
+      projectTitle:
+          (d[FirebaseConstants.fieldProjectTitle] ?? 'Project').toString(),
+      track: (d[FirebaseConstants.fieldTrack] ?? 'Contributor').toString(),
+      status: status,
+      createdAt: createdAt,
+    );
+  }
+
   ApplicantModel _applicantFromDoc(Map<String, dynamic> d) {
     final snap = d[FirebaseConstants.fieldApplicantSnapshot] is Map
         ? Map<String, dynamic>.from(
@@ -562,182 +909,4 @@ class MyProjectsRepo {
           : const ['Flutter'],
     );
   }
-
-  List<ProjectModel> _fallbackProjects() => [
-    ProjectModel(
-      id: 'eco',
-      name: 'EcoTrack Mobile',
-      description:
-          'Real-time carbon telemetry and sensor analytics for smart buildings over Bluetooth Low Energy.',
-      statusText: 'Active • Sprint 2',
-      isOwner: true,
-      membersCount: 3,
-      totalSeats: 5,
-      tags: ['BLE v5.3', 'SQLite Sync', 'MIT License'],
-      openRoles: ['Backend / SQLite Architect', 'BLE Telemetry Integrator'],
-      repoUrl: 'https://github.com/ecotrack/mobile',
-      cloneUrl: 'https://github.com/ecotrack/mobile.git',
-      defaultBranch: 'develop',
-      gitRules: const GitWorkflowRules(
-        customRules: ['Run flutter analyze before opening any Pull Request'],
-      ),
-    ),
-    ProjectModel(
-      id: 'algo',
-      name: 'AlgoViz Flutter',
-      description: 'Algorithm visualizer built with Flutter canvas.',
-      statusText: 'Active • v1.2',
-      isOwner: false,
-      membersCount: 4,
-      totalSeats: 4,
-      tags: ['Flutter', 'Canvas'],
-      openRoles: [],
-      repoUrl: 'https://github.com/algoviz/flutter',
-      cloneUrl: 'https://github.com/algoviz/flutter.git',
-      defaultBranch: 'main',
-    ),
-    ProjectModel(
-      id: 'p3',
-      name: 'CloudMesh Go',
-      description: 'Distributed mesh network tooling written in Go.',
-      statusText: 'Planning',
-      isOwner: true,
-      membersCount: 1,
-      totalSeats: 4,
-      tags: ['Go', 'gRPC'],
-      openRoles: ['Go Systems Engineer'],
-      repoUrl: 'https://github.com/cloudmesh/go-cli',
-      cloneUrl: 'https://github.com/cloudmesh/go-cli.git',
-      defaultBranch: 'develop',
-    ),
-    ProjectModel(
-      id: 'p4',
-      name: 'KubeLens Mobile',
-      description: 'Shipped v1.0 release with 1,200 stars on GitHub.',
-      statusText: 'Completed',
-      isOwner: false,
-      membersCount: 5,
-      totalSeats: 5,
-      tags: ['Flutter'],
-      openRoles: [],
-      period: 'Jan 2024 - Jun 2024 (6 mos)',
-      type: ProjectType.previous,
-      repoUrl: 'https://github.com/kubelens/mobile',
-      cloneUrl: 'https://github.com/kubelens/mobile.git',
-      defaultBranch: 'main',
-    ),
-    ProjectModel(
-      id: 'p5',
-      name: 'RustAudio Engine',
-      description: 'Archived after core goals were fulfilled.',
-      statusText: 'Archived',
-      isOwner: true,
-      membersCount: 3,
-      totalSeats: 3,
-      tags: ['Rust'],
-      openRoles: [],
-      period: 'Sep 2023 - Dec 2023',
-      type: ProjectType.previous,
-      repoUrl: 'https://github.com/rustaudio/engine',
-      cloneUrl: 'https://github.com/rustaudio/engine.git',
-      defaultBranch: 'main',
-    ),
-    ProjectModel(
-      id: 'p6',
-      name: 'DevSync AI Reviewer',
-      description: 'Automated PR feedback bot checking architecture rules and lint checks.',
-      statusText: 'Draft',
-      isOwner: true,
-      membersCount: 1,
-      totalSeats: 3,
-      tags: ['Python', 'FastAPI', 'GitHub API'],
-      openRoles: ['Backend Engineer', 'ML Engineer'],
-      type: ProjectType.draft,
-      defaultBranch: 'develop',
-    ),
-  ];
-
-  List<InvitationModel> _fallbackInvitations() => [
-    InvitationModel(
-      id: 'i1',
-      projectName: 'NeuroPulse Swift',
-      ownerName: 'Elena Rostova',
-      ownerRole: 'Core Maintainer',
-      note:
-          'We saw your work on signal processing and think you would be a great fit for our team.',
-      role: 'Core iOS / Metal',
-      hoursPerWeek: '8-10 hrs / wk',
-      level: 'Mid - Senior',
-      responsibilities: [
-        'Build real-time EEG signal processing',
-        'Write Metal shaders for visualization',
-      ],
-      skills: ['Swift', 'Metal Shader', 'DSP'],
-    ),
-    InvitationModel(
-      id: 'i2',
-      projectName: 'DevKube CLI',
-      ownerName: 'David Chen',
-      ownerRole: 'Project Lead',
-      note: 'Your Go experience is exactly what we need for the CLI.',
-      role: 'Go Systems',
-      hoursPerWeek: '6-8 hrs / wk',
-      level: 'Mid',
-      responsibilities: [
-        'Develop multi-cluster debugging commands',
-        'Write unit tests',
-      ],
-      skills: ['Go', 'Kubernetes', 'gRPC'],
-    ),
-  ];
-
-  List<ApplicantModel> _fallbackApplicants() => [
-    ApplicantModel(
-      id: 'a1',
-      projectId: 'eco',
-      applicantUid: 'u_liam',
-      name: "Liam O'Connor",
-      title: 'Senior Mobile Backend Developer',
-      location: 'Dublin, IE',
-      level: 'Senior',
-      username: '@liamoconnor',
-      matchPercent: 94,
-      position: 'Backend / SQLite Architect',
-      coverNote:
-          'I have been tracking EcoTrack Mobile since the RFC. I previously built offline-first telemetry caching in SQLite and can dedicate 8 hrs/week.',
-      skills: ['SQLite', 'Drift', 'Dart Isolates'],
-    ),
-    ApplicantModel(
-      id: 'a2',
-      projectId: 'eco',
-      applicantUid: 'u_amina',
-      name: 'Amina Al-Mansour',
-      title: 'QA Automation Engineer',
-      location: 'Toronto, CA',
-      level: 'Mid-Level',
-      username: '@amina_qa',
-      matchPercent: 89,
-      position: 'Integration & QA Contributor',
-      coverNote:
-          'I would love to write golden widget tests and automate BLE test mocks.',
-      skills: ['Flutter Test', 'Mocktail', 'CI/CD'],
-    ),
-  ];
-
-  List<DeveloperModel> _fallbackDevelopers() => [
-    DeveloperModel(
-      id: 'd1',
-      name: 'Sofia Chen',
-      title: 'Senior Distributed Systems & Dart Engineer',
-      fitPercent: 96,
-      skills: ['Dart', 'C++ FFI', 'BLE'],
-    ),
-    DeveloperModel(
-      id: 'd2',
-      name: 'Omar Hassan',
-      title: 'Flutter & Firebase Architect',
-      fitPercent: 91,
-      skills: ['Flutter', 'Firebase', 'BLoC'],
-    ),
-  ];
 }

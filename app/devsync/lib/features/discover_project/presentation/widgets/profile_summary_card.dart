@@ -63,7 +63,9 @@ class ProfileSummaryCard extends StatelessWidget {
                       width: 14,
                       height: 14,
                       decoration: BoxDecoration(
-                        color: c.success,
+                        color: d.isOnline
+                            ? c.success
+                            : c.textSecondary.withValues(alpha: 0.45),
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: c.backgroundPrimary,

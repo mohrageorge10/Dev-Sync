@@ -30,6 +30,22 @@ class SocialLinksSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.colors;
 
+    if (items.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: c.backgroundPrimary,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: c.border),
+        ),
+        child: Text(
+          'No connected accounts added yet.',
+          style: AppStyles.body12Secondary(context),
+        ),
+      );
+    }
+
     return Column(
       children: [
         for (final item in items)

@@ -10,6 +10,7 @@ import 'package:devsync/features/profile/presentation/widgets/profile_buttons.da
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // In-app PDF viewer for previewing, replacing, or deleting the user's CV.
 class CvViewerScreen extends StatefulWidget {
@@ -145,6 +146,15 @@ class _CvViewerScreenState extends State<CvViewerScreen> {
           ],
         ),
         actions: [
+          if (hasUrl)
+            IconButton(
+              tooltip: 'Open in browser',
+              icon: const Icon(Icons.open_in_new_rounded, size: 20),
+              onPressed: () => launchUrl(
+                Uri.parse(_url!),
+                mode: LaunchMode.externalApplication,
+              ),
+            ),
           IconButton(
             tooltip: 'Zoom out',
             icon: const Icon(Icons.zoom_out_rounded, size: 20),
@@ -169,7 +179,15 @@ class _CvViewerScreenState extends State<CvViewerScreen> {
             child: _isBusy
                 ? const Center(child: CircularProgressIndicator())
                 : _loadError != null
-                ? _ErrorState(message: _loadError!)
+                ? _ErrorState(
+                    message: _loadError!,
+                    onOpenExternal: hasUrl
+                        ? () => launchUrl(
+                            Uri.parse(_url!),
+                            mode: LaunchMode.externalApplication,
+                          )
+                        : null,
+                  )
                 : hasBytes
                 ? SfPdfViewer.memory(
                     _bytes!,
@@ -269,9 +287,10 @@ class _CvViewerScreenState extends State<CvViewerScreen> {
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message});
+  const _ErrorState({required this.message, this.onOpenExternal});
 
   final String message;
+  final VoidCallback? onOpenExternal;
 
   @override
   Widget build(BuildContext context) {
@@ -292,6 +311,14 @@ class _ErrorState extends StatelessWidget {
               textAlign: TextAlign.center,
               style: AppStyles.body13Secondary(context),
             ),
+            if (onOpenExternal != null) ...[
+              const SizedBox(height: 16),
+              ProfilePrimaryButton(
+                'Open in Browser',
+                icon: Icons.open_in_new_rounded,
+                onPressed: onOpenExternal,
+              ),
+            ],
           ],
         ),
       ),
