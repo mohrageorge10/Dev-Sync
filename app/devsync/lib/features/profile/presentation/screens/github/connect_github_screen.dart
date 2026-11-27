@@ -1,30 +1,78 @@
 import 'package:devsync/core/constants/app_images.dart';
 import 'package:devsync/core/routing/app_routes.dart';
+import 'package:devsync/core/shared/feedback/app_feedback.dart';
 import 'package:devsync/core/theme/app_colors.dart';
 import 'package:devsync/core/theme/app_styles.dart';
+import 'package:devsync/features/profile/data/services/github_service.dart';
+import 'package:devsync/features/profile/presentation/cubit/profile_controller.dart';
 import 'package:devsync/features/profile/presentation/widgets/profile_buttons.dart';
 import 'package:devsync/features/profile/presentation/widgets/profile_card.dart';
 import 'package:devsync/features/profile/presentation/widgets/profile_scaffold.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-// Intro screen explaining read-only GitHub permissions before launching analysis.
-class ConnectGithubScreen extends StatelessWidget {
+// Intro screen for entering a GitHub username and launching real GitHub REST API analysis.
+class ConnectGithubScreen extends StatefulWidget {
   const ConnectGithubScreen({super.key});
+
+  @override
+  State<ConnectGithubScreen> createState() => _ConnectGithubScreenState();
+}
+
+class _ConnectGithubScreenState extends State<ConnectGithubScreen> {
+  final TextEditingController _usernameCtrl = TextEditingController();
+  bool _initialized = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      final profile = ProfileScope.of(context);
+      final existing = GithubService.extractUsername(profile.githubUrl);
+      if (existing.isNotEmpty) {
+        _usernameCtrl.text = existing;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _usernameCtrl.dispose();
+    super.dispose();
+  }
+
+  void _startConnect() {
+    final handle = GithubService.extractUsername(_usernameCtrl.text);
+    if (handle.isEmpty) {
+      AppFeedback.show(
+        context,
+        message: 'Please enter your GitHub username or profile link',
+        type: AppFeedbackType.error,
+      );
+      return;
+    }
+    final profile = ProfileScope.of(context);
+    profile.setLinks(github: 'https://github.com/$handle');
+    Navigator.pushReplacementNamed(
+      context,
+      AppRoutes.profileGithubAnalysis,
+      arguments: handle,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
+    final hasUsername =
+        GithubService.extractUsername(_usernameCtrl.text).isNotEmpty;
 
     return ProfileScaffold(
       title: 'Connect GitHub',
       footer: ProfilePrimaryButton(
-        'Connect GitHub',
+        'Connect & Analyze GitHub',
         icon: Icons.code,
-        onPressed: () => Navigator.pushReplacementNamed(
-          context,
-          AppRoutes.profileGithubAnalysis,
-        ),
+        onPressed: hasUsername ? _startConnect : null,
       ),
       child: Column(
         children: [
@@ -48,13 +96,56 @@ class ConnectGithubScreen extends StatelessWidget {
           Text('Connect your GitHub', style: AppStyles.h28(context)),
           const SizedBox(height: 6),
           Text(
-            'DevSync reads your public activity to automatically detect skills, frameworks, and velocity from real code.',
+            'Enter your GitHub username so DevSync can read your public repositories, languages, and PR activity.',
             textAlign: TextAlign.center,
             style: AppStyles.body13Secondary(context),
           ),
           const SizedBox(height: 10),
           const ProfileTag('AUTO-GENERATES VERIFIED SKILL BADGES'),
           const SizedBox(height: 18),
+          ProfileCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'GitHub Username or Profile URL',
+                  style: AppStyles.body13Bold(context),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _usernameCtrl,
+                  onChanged: (_) => setState(() {}),
+                  textInputAction: TextInputAction.done,
+                  onSubmitted: (_) => _startConnect(),
+                  style: AppStyles.body14Primary(context),
+                  decoration: InputDecoration(
+                    hintText: 'e.g. octocat or github.com/octocat',
+                    hintStyle: AppStyles.body13Secondary(context),
+                    prefixIcon: Icon(
+                      Icons.alternate_email_rounded,
+                      size: 18,
+                      color: c.primary,
+                    ),
+                    filled: true,
+                    fillColor: c.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: c.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: c.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: c.primary),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           const ProfileCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -72,17 +163,17 @@ class ConnectGithubScreen extends StatelessWidget {
                 _PermissionRow(
                   Icons.check_circle,
                   'Languages & Frameworks',
-                  'Byte-level language ratios detected across merged commits.',
+                  'Byte-level language ratios detected across public repos.',
                 ),
                 _PermissionRow(
                   Icons.check_circle,
                   'Commit activity',
-                  'Frequency, streaks, and recency of updates for team matching.',
+                  'Recent public push activity and stars for team matching.',
                 ),
                 _PermissionRow(
                   Icons.check_circle,
-                  'Pull requests & code reviews',
-                  'Merged PRs and recognized collaborative open-source work.',
+                  'Pull requests',
+                  'Merged PRs and collaborative open-source work.',
                 ),
               ],
             ),
@@ -111,13 +202,13 @@ class ConnectGithubScreen extends StatelessWidget {
                 const _PermissionRow(
                   Icons.visibility_off_outlined,
                   'No private code reading',
-                  'Proprietary repos remain 100% untouched and invisible.',
+                  'Private repositories remain 100% untouched and invisible.',
                   negative: true,
                 ),
                 const _PermissionRow(
                   Icons.link_off,
                   'Disconnect anytime',
-                  'Revoke OAuth tokens instantly with a single tap in Settings.',
+                  'Remove your linked GitHub handle with a single tap.',
                   negative: true,
                 ),
               ],
@@ -179,12 +270,16 @@ class _PermissionRow extends StatelessWidget {
     final c = context.colors;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: negative ? c.textSecondary : c.primary),
-          const SizedBox(width: 10),
+          Icon(
+            icon,
+            size: 16,
+            color: negative ? c.error : c.success,
+          ),
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

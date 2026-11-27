@@ -13,10 +13,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 class PublishCubit extends Cubit<PublishState> {
   PublishCubit({
     required this._repository,
-    required DraftCubit draftCubit,
+    required this._draftCubit,
     required this._teamCubit,
-  }) : _draftCubit = draftCubit,
-       super(const PublishInitial());
+  }) : super(const PublishInitial());
 
   final ProjectRepository _repository;
   final DraftCubit _draftCubit;

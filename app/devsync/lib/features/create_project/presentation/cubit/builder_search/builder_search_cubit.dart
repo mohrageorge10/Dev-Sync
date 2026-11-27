@@ -11,9 +11,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 // Developer search, track filter, and multi-select cubit.
 class BuilderSearchCubit extends Cubit<BuilderSearchState> {
-  BuilderSearchCubit({required this._repository, required TeamCubit teamCubit})
-    : _teamCubit = teamCubit,
-      super(const BuilderSearchState());
+  BuilderSearchCubit({required this._repository, required this._teamCubit})
+    : super(const BuilderSearchState());
 
   final BuildersRepository _repository;
   final TeamCubit _teamCubit;

@@ -21,6 +21,7 @@ import 'package:devsync/features/discover_project/presentation/widgets/profile_s
 import 'package:devsync/features/discover_project/presentation/widgets/public_cv_card.dart';
 import 'package:devsync/features/discover_project/presentation/widgets/skills_section_card.dart';
 import 'package:devsync/features/discover_project/presentation/widgets/social_links_section.dart';
+import 'package:devsync/features/profile/presentation/widgets/github/github_summary_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -183,6 +184,13 @@ class _ProfileView extends StatelessWidget {
               PublicCvCard(developer: developer),
               const Header(title: 'Connected Accounts', text: 'Verified links'),
               SocialLinksSection(items: developer.socialLinks),
+              if (developer.githubAnalysis != null) ...[
+                Header(
+                  title: 'GitHub Activity',
+                  text: '@${developer.githubAnalysis!.username}',
+                ),
+                GithubSummaryCard(analysis: developer.githubAnalysis!),
+              ],
               FutureBuilder<List<PortfolioProjectData>>(
                 future: ServiceLocator.isRegistered<DiscoverRepository>()
                     ? ServiceLocator.get<DiscoverRepository>()
