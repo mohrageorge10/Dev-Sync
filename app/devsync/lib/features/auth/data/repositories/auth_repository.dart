@@ -52,13 +52,50 @@ class AuthRepository {
         return _profileOrSignOut(user);
       });
 
-  // Email and password registration with profile creation.
+  // Check whether a username is unused across existing users (case-insensitive).
+  Future<bool> isUsernameAvailable(String username) async {
+    final clean = username.trim().toLowerCase().replaceAll('@', '');
+    if (clean.length < 3) return false;
+    try {
+      final docs = await _firestore.getCollection(
+        collectionPath: FirebaseConstants.usersCollection,
+      );
+      for (final doc in docs) {
+        final existing = (doc['username'] ?? '').toString().trim().toLowerCase();
+        if (existing == clean) return false;
+        if (existing.isEmpty) {
+          final derived = (doc[FirebaseConstants.fieldName] ?? '')
+              .toString()
+              .toLowerCase()
+              .replaceAll(RegExp(r'[^a-z0-9]'), '');
+          if (derived == clean) return false;
+        }
+      }
+      return true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  // Email and password registration with unique username check and profile creation.
   Future<UserModel> register({
     required String name,
+    required String username,
     required String email,
     required String password,
   }) =>
       _guard(() async {
+        final cleanUsername = username.trim().toLowerCase().replaceAll('@', '');
+        if (cleanUsername.length < 3) {
+          throw const AuthException('Username must be at least 3 characters.');
+        }
+        final available = await isUsernameAvailable(cleanUsername);
+        if (!available) {
+          throw const AuthException(
+            'This username is already taken. Please choose another.',
+          );
+        }
+
         final user = await _auth.signUpWithEmailAndPassword(
           email: email,
           password: password,
@@ -67,7 +104,11 @@ class AuthRepository {
 
         try {
           await _auth.updateDisplayName(displayName: name);
-          return await _loadOrCreateProfile(user, name: name);
+          return await _loadOrCreateProfile(
+            user,
+            name: name,
+            username: cleanUsername,
+          );
         } catch (_) {
           await _rollbackNewUser(user);
           rethrow;
@@ -87,7 +128,7 @@ class AuthRepository {
     try {
       return await _guard(() async {
         final user = await _auth.signInWithGoogle();
-        if (user == null) throw const AuthException(_noUserMessage);
+        if (user == null) return null;
         return _profileOrSignOut(user);
       });
     } on GoogleSignInException catch (e) {
@@ -104,7 +145,11 @@ class AuthRepository {
   Future<void> logout() => _guard(() => _auth.signOut());
 
   // Load existing Firestore profile or create a new one atomically.
-  Future<UserModel> _loadOrCreateProfile(User user, {String? name}) async {
+  Future<UserModel> _loadOrCreateProfile(
+    User user, {
+    String? name,
+    String? username,
+  }) async {
     try {
       final email = user.email ?? '';
       final existing = await _firestore.getDocument(
@@ -126,6 +171,7 @@ class AuthRepository {
           email: email,
           photoUrl: user.photoURL,
         ),
+        username: username,
       );
     } on AuthException {
       rethrow;
@@ -136,7 +182,7 @@ class AuthRepository {
   }
 
   // Create publicIds, users, and userPrivate documents in a single transaction.
-  Future<UserModel> _createProfile(UserModel base) async {
+  Future<UserModel> _createProfile(UserModel base, {String? username}) async {
     for (var attempt = 0; attempt < _publicIdMaxAttempts; attempt++) {
       final publicId = _generatePublicId();
 
@@ -164,6 +210,7 @@ class AuthRepository {
         });
         tx.set(userRef, {
           ...base.toUserJson(),
+          if (username != null && username.isNotEmpty) 'username': username,
           FirebaseConstants.fieldPublicId: publicId,
           FirebaseConstants.fieldCreatedAt: now,
           FirebaseConstants.fieldUpdatedAt: now,

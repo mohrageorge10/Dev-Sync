@@ -31,6 +31,13 @@
 
   <title>devsync</title>
   <link rel="manifest" href="manifest.json">
+  <!-- Required by syncfusion_flutter_pdfviewer on Web -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.mjs" type="module"></script>
+  <script type="module">
+    var { pdfjsLib } = globalThis;
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.mjs";
+  </script>
 </head>
 <body>
   <!--

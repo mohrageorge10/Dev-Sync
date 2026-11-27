@@ -75,6 +75,22 @@ class FirebaseAuthService {
   // ================= Google Sign-In =================
 
   Future<User?> signInWithGoogle() async {
+    // On Web, Firebase's native GoogleAuthProvider popup works reliably without GIS button hacks.
+    if (kIsWeb) {
+      try {
+        final provider = GoogleAuthProvider()
+          ..setCustomParameters({'prompt': 'select_account'});
+        final UserCredential result = await auth.signInWithPopup(provider);
+        return result.user;
+      } on FirebaseAuthException catch (e) {
+        if (e.code == 'popup-closed-by-user' ||
+            e.code == 'cancelled-popup-request') {
+          return null;
+        }
+        rethrow;
+      }
+    }
+
     await _initializeGoogleSignIn();
 
     final GoogleSignInAccount googleUser =

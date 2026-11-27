@@ -28,15 +28,17 @@ class PublicCvCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.colors;
-    final hasCv = developer.hasCv;
-    final fileName = developer.cvFileName?.trim().isNotEmpty == true
-        ? developer.cvFileName!.trim()
+    final hasUrl = developer.hasCv;
+    final rawName = developer.cvFileName?.trim() ?? '';
+    final hasNameOnly = !hasUrl && rawName.isNotEmpty;
+    final fileName = rawName.isNotEmpty
+        ? rawName
         : '${developer.name.replaceAll(' ', '_')}_CV.pdf';
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: hasCv ? () => _openCv(context) : null,
+        onTap: hasUrl ? () => _openCv(context) : null,
         borderRadius: BorderRadius.circular(16),
         child: Container(
           width: double.infinity,
@@ -52,12 +54,12 @@ class PublicCvCard extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: hasCv ? c.subtleBlueSurface : c.surface,
+                  color: hasUrl ? c.subtleBlueSurface : c.surface,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   Icons.picture_as_pdf_rounded,
-                  color: hasCv ? c.primary : c.textSecondary,
+                  color: hasUrl ? c.primary : c.textSecondary,
                   size: 20,
                 ),
               ),
@@ -67,30 +69,28 @@ class PublicCvCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      hasCv ? fileName : 'No CV uploaded yet',
+                      (hasUrl || hasNameOnly) ? fileName : 'No CV uploaded yet',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: hasCv
+                      style: hasUrl
                           ? AppStyles.body14Bold(context)
                           : AppStyles.body13Secondary(context),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      hasCv
+                      hasUrl
                           ? 'Tap to view resume in-app'
+                          : hasNameOnly
+                          ? 'CV file needs re-upload to enable preview'
                           : 'This developer has not attached a resume',
                       style: AppStyles.body12Secondary(context),
                     ),
                   ],
                 ),
               ),
-              if (hasCv) ...[
+              if (hasUrl) ...[
                 const SizedBox(width: 8),
-                Icon(
-                  Icons.visibility_outlined,
-                  color: c.primary,
-                  size: 18,
-                ),
+                Icon(Icons.visibility_outlined, color: c.primary, size: 18),
               ],
             ],
           ),

@@ -13,6 +13,9 @@ abstract class MatchRepo {
   /// Matches of the signed-in user, best score first.
   Future<List<MatchModel>> getMatches();
 
+  /// Real-time stream of matches stored in `matches/{uid}/items`.
+  Stream<List<MatchModel>> watchMatches() => const Stream.empty();
+
   Future<void> submitFeedback(MatchFeedback feedback);
 
   // ---- Project actions (Why This Fits screen) ----
@@ -67,6 +70,20 @@ class FirestoreMatchRepo implements MatchRepo {
 
   /// Firestore waits forever when offline; fail after this instead.
   static const _netTimeout = Duration(seconds: 10);
+
+  @override
+  Stream<List<MatchModel>> watchMatches() {
+    final uid = _auth.currentUserId;
+    if (uid == null) return const Stream.empty();
+    return _firestore
+        .collectionStream(
+          collectionPath:
+              '${FirebaseConstants.matchesCollection}/$uid/${FirebaseConstants.matchItemsCollection}',
+          queryBuilder: (q) =>
+              q.orderBy(FirebaseConstants.fieldScore, descending: true),
+        )
+        .map((docs) => docs.map(MatchModel.fromFirestore).toList());
+  }
 
   @override
   Future<List<MatchModel>> getMatches() async {
@@ -358,6 +375,9 @@ class FirestoreMatchRepo implements MatchRepo {
 
 // Local sample data (used when Firestore is empty or offline).
 class MockMatchRepo implements MatchRepo {
+  @override
+  Stream<List<MatchModel>> watchMatches() => const Stream.empty();
+
   @override
   Future<List<MatchModel>> getMatches() async => [
         MatchModel(

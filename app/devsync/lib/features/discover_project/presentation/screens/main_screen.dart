@@ -1,4 +1,5 @@
 import 'package:devsync/core/di/service_locator.dart';
+import 'package:devsync/core/services/firebase/presence_service.dart';
 import 'package:devsync/core/shared/nav_bar/app_bottom_nav_bar.dart';
 import 'package:devsync/features/discover_project/presentation/cubit/discover/discover_cubit.dart';
 import 'package:devsync/features/discover_project/presentation/cubit/discover/discover_cubit_scope.dart';
@@ -26,6 +27,9 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    if (ServiceLocator.isRegistered<PresenceService>()) {
+      ServiceLocator.get<PresenceService>().start();
+    }
     if (ServiceLocator.isRegistered<DiscoverCubit>()) {
       ServiceLocator.get<DiscoverCubit>().loadData();
     }

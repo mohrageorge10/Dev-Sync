@@ -4,6 +4,7 @@ import 'package:devsync/core/networking/api/dio_consumer.dart';
 import 'package:devsync/core/services/cloudinary/cloudinary_service.dart';
 import 'package:devsync/core/services/firebase/firebase_auth_service.dart';
 import 'package:devsync/core/services/firebase/firestore_service.dart';
+import 'package:devsync/core/services/firebase/presence_service.dart';
 import 'package:devsync/features/ai_match/di/ai_match_di.dart';
 import 'package:devsync/features/auth/data/repositories/auth_repository.dart';
 import 'package:devsync/features/auth/presentation/cubit/auth_cubit.dart';
@@ -35,6 +36,12 @@ void setupLocator() {
   );
   ServiceLocator.registerLazySingleton<FirestoreService>(
     () => FirestoreService(),
+  );
+  ServiceLocator.registerLazySingleton<PresenceService>(
+    () => PresenceService(
+      firestoreService: ServiceLocator.get<FirestoreService>(),
+      authService: ServiceLocator.get<FirebaseAuthService>(),
+    ),
   );
 
   // Auth Repository & Cubit
@@ -113,6 +120,6 @@ void setupLocator() {
     () => MyProjectsCubit(ServiceLocator.get<MyProjectsRepo>()),
   );
 
-  // AI Match Repositories & Cubits
-  setupAiMatchDependencies(useSampleData: true);
+  // AI Match Repositories & Cubits (real Firestore data only)
+  setupAiMatchDependencies(useSampleData: false);
 }

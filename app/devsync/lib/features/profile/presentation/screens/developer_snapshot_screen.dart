@@ -1,4 +1,5 @@
 import 'package:devsync/core/di/service_locator.dart';
+import 'package:devsync/core/services/firebase/presence_service.dart';
 import 'package:devsync/core/routing/app_routes.dart';
 import 'package:devsync/core/theme/app_colors.dart';
 import 'package:devsync/core/theme/app_styles.dart';
@@ -150,6 +151,9 @@ class DeveloperSnapshotScreen extends StatelessWidget {
       },
     );
     if (confirmed != true || !context.mounted) return;
+    if (ServiceLocator.isRegistered<PresenceService>()) {
+      await ServiceLocator.get<PresenceService>().goOffline();
+    }
     await profile.signOut();
     if (ServiceLocator.isRegistered<DiscoverCubit>()) {
       ServiceLocator.get<DiscoverCubit>().reset();

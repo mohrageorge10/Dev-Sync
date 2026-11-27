@@ -1,20 +1,22 @@
 import 'dart:async';
 
 import 'package:devsync/features/ai_match/business_logic/match_state.dart';
+import 'package:devsync/features/ai_match/data/models/match_model.dart';
 import 'package:devsync/features/ai_match/data/repos/match_repo.dart';
 import 'package:devsync/features/ai_match/utils/ai_match_strings.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-/// Loads the user's match history (best score first).
+// Loads and streams the user's match history (best score first).
 class MatchCubit extends Cubit<MatchState> {
   MatchCubit(this._repo, {Stream<String?>? userIdChanges})
       : super(const MatchInitial()) {
-    // Login / logout -> the matches belong to another user: load again.
+    // Login / logout -> reload matches and re-bind real-time stream.
     _sub = userIdChanges?.distinct().skip(1).listen((_) => load(silent: true));
   }
 
   final MatchRepo _repo;
   StreamSubscription<String?>? _sub;
+  StreamSubscription<List<MatchModel>>? _matchesSub;
   bool _busy = false;
 
   /// [silent] = pull to refresh: keep the list on screen while loading
@@ -30,6 +32,7 @@ class MatchCubit extends Cubit<MatchState> {
       // Best score first, whatever order the repo returns.
       final sorted = [...matches]..sort((a, b) => b.score.compareTo(a.score));
       emit(MatchLoaded(sorted));
+      _startMatchesStream();
     } catch (_) {
       if (isClosed || keepList) return;
       emit(const MatchError(AiMatchStrings.genericError));
@@ -38,9 +41,19 @@ class MatchCubit extends Cubit<MatchState> {
     }
   }
 
+  void _startMatchesStream() {
+    _matchesSub?.cancel();
+    _matchesSub = _repo.watchMatches().listen((live) {
+      if (isClosed || live.isEmpty) return;
+      final sorted = [...live]..sort((a, b) => b.score.compareTo(a.score));
+      emit(MatchLoaded(sorted));
+    }, onError: (_) {});
+  }
+
   @override
   Future<void> close() {
     _sub?.cancel();
+    _matchesSub?.cancel();
     return super.close();
   }
 }

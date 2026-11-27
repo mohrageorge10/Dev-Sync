@@ -1,4 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:devsync/core/services/firebase/firebase_constants.dart';
+import 'package:devsync/core/services/firebase/presence_service.dart';
 import 'package:devsync/core/utils/devsync_enums.dart';
 import 'package:devsync/features/create_project/data/model/enums.dart';
 import 'package:devsync/features/discover_project/data/model/filter_matching.dart';
@@ -47,38 +49,51 @@ class DeveloperModel {
     this.linkedinUrl,
     this.cvUrl,
     this.cvFileName,
+    this.isOnline = false,
+    this.lastSeen,
     this.projects = const [],
   });
 
   // Parse from Firestore user document.
   factory DeveloperModel.fromFirestore(Map<String, dynamic> map) {
     final id = (map[FirebaseConstants.fieldUid] ?? map['id'] ?? '').toString();
-    final track = UserTrackX.fromName(
-      map[FirebaseConstants.fieldTrack]?.toString(),
-    );
+    final rawTrack = (map[FirebaseConstants.fieldTrack] ?? '').toString().trim();
+    final roleLabel = _resolveTrackLabel(rawTrack);
+
     final rawLevel =
-        (map[FirebaseConstants.fieldLevel] ?? 'intermediate').toString();
+        (map[FirebaseConstants.fieldLevel] ?? 'intermediate').toString().trim();
     final level = UserLevel.values.firstWhere(
-      (l) => l.name == rawLevel.toLowerCase(),
+      (l) =>
+          l.name.toLowerCase() == rawLevel.toLowerCase() ||
+          l.label.toLowerCase() == rawLevel.toLowerCase(),
       orElse: () => UserLevel.intermediate,
     );
 
     final rawSkills = map[FirebaseConstants.fieldSkills];
     final skills = <String>[
       if (rawSkills is Iterable)
-        for (final s in rawSkills) s.toString(),
+        for (final s in rawSkills)
+          if (s.toString().trim().isNotEmpty) s.toString().trim(),
     ];
 
-    final photo = map[FirebaseConstants.fieldPhotoUrl]?.toString();
-    final bio = (map[FirebaseConstants.fieldBio] ?? '').toString();
-    final handle = map[FirebaseConstants.fieldPublicId]?.toString();
+    final photo = map[FirebaseConstants.fieldPhotoUrl]?.toString().trim();
+    final bio = (map[FirebaseConstants.fieldBio] ?? '').toString().trim();
+    final rawUsername = map['username']?.toString().trim();
+    final rawPublicId = map[FirebaseConstants.fieldPublicId]?.toString().trim();
+    final handle = (rawUsername != null && rawUsername.isNotEmpty)
+        ? rawUsername
+        : rawPublicId;
     final hasGithub = map[FirebaseConstants.fieldGithubConnected] == true;
-    final ghUser = map[FirebaseConstants.fieldGithubUsername]?.toString();
-    final cleanHandle = (ghUser != null && ghUser.trim().isNotEmpty)
-        ? ghUser.trim().replaceAll('@', '')
-        : (handle != null && handle.isNotEmpty)
-        ? handle.replaceAll('@', '')
-        : id;
+    final ghUser = map[FirebaseConstants.fieldGithubUsername]?.toString().trim();
+    final rawGithubUrl = map['githubUrl']?.toString().trim();
+    String? githubUrl;
+    if (rawGithubUrl != null && rawGithubUrl.isNotEmpty) {
+      githubUrl = rawGithubUrl;
+    } else if (ghUser != null && ghUser.isNotEmpty) {
+      githubUrl = 'https://github.com/${ghUser.replaceAll('@', '')}';
+    } else if (hasGithub && handle != null && handle.isNotEmpty) {
+      githubUrl = 'https://github.com/${handle.replaceAll('@', '')}';
+    }
 
     final rawCv = map[FirebaseConstants.fieldCvUrl]?.toString().trim();
     final rawCvName = map[FirebaseConstants.fieldCvFileName]?.toString().trim();
@@ -88,6 +103,17 @@ class DeveloperModel {
     final rawLinkedin = map[FirebaseConstants.fieldLinkedinUrl]
         ?.toString()
         .trim();
+    final rawLastSeen = map[FirebaseConstants.fieldLastSeen];
+    DateTime? lastSeen;
+    if (rawLastSeen is Timestamp) {
+      lastSeen = rawLastSeen.toDate();
+    } else if (rawLastSeen is String) {
+      lastSeen = DateTime.tryParse(rawLastSeen);
+    }
+    final isOnline = PresenceService.isRecentlyOnline(
+      map[FirebaseConstants.fieldIsOnline] == true,
+      lastSeen,
+    );
 
     final matchPercent = (78 + (skills.length * 4)).clamp(75, 98);
 
@@ -97,17 +123,15 @@ class DeveloperModel {
       publicId: handle,
       imageUrl: (photo != null && photo.isNotEmpty) ? photo : null,
       hasGithub: hasGithub,
-      role: track.label,
+      role: roleLabel,
       level: level.label,
-      skills: skills.isEmpty ? const ['Flutter', 'Dart'] : skills,
-      bio: bio.isNotEmpty
-          ? bio
-          : '${track.label} engineer ready to collaborate on open builds.',
+      skills: skills,
+      bio: bio,
       matchPercent: matchPercent,
       repositoriesCount: '${8 + skills.length * 2}',
       commitsCount: '${180 + skills.length * 45}',
       projectsCount: '${2 + (skills.length ~/ 2)}',
-      githubUrl: hasGithub ? 'https://github.com/$cleanHandle' : null,
+      githubUrl: githubUrl,
       portfolioUrl: (rawPortfolio != null && rawPortfolio.isNotEmpty)
           ? rawPortfolio
           : null,
@@ -118,7 +142,21 @@ class DeveloperModel {
       cvFileName: (rawCvName != null && rawCvName.isNotEmpty)
           ? rawCvName
           : null,
+      isOnline: isOnline,
+      lastSeen: lastSeen,
     );
+  }
+
+  // Resolve track label from either enum key (e.g. "uiUx") or display label (e.g. "UI/UX").
+  static String _resolveTrackLabel(String raw) {
+    if (raw.isEmpty) return 'Developer';
+    final lower = raw.toLowerCase();
+    for (final t in UserTrack.values) {
+      if (t.name.toLowerCase() == lower || t.label.toLowerCase() == lower) {
+        return t.label;
+      }
+    }
+    return raw;
   }
 
   final String id;
@@ -139,9 +177,12 @@ class DeveloperModel {
   final String? linkedinUrl;
   final String? cvUrl;
   final String? cvFileName;
+  final bool isOnline;
+  final DateTime? lastSeen;
   final List<PortfolioProjectData> projects;
 
   bool get hasCv => cvUrl != null && cvUrl!.trim().isNotEmpty;
+  String get presenceLabel => PresenceService.formatPresence(isOnline, lastSeen);
 
   // Normalized @handle for display.
   String get handle {
@@ -199,41 +240,35 @@ class DeveloperModel {
     };
   }
 
-  // Dynamic social links based on developer profile.
+  // Only real social links actually added by the developer (no fabricated URLs).
   List<SocialLinkItem> get socialLinks {
-    final user = username;
     return [
-      SocialLinkItem(
-        icon: Icons.code_rounded,
-        title: 'GitHub',
-        subtitle: '@$user',
-        url: githubUrl ?? 'https://github.com/$user',
-        isConnected: hasGithub,
-      ),
-      if (portfolioUrl != null && portfolioUrl!.isNotEmpty)
+      if (githubUrl != null && githubUrl!.trim().isNotEmpty)
+        SocialLinkItem(
+          icon: Icons.code_rounded,
+          title: 'GitHub',
+          subtitle: githubUrl!.trim(),
+          url: githubUrl!.trim(),
+          isConnected: hasGithub,
+        ),
+      if (portfolioUrl != null && portfolioUrl!.trim().isNotEmpty)
         SocialLinkItem(
           icon: Icons.language_rounded,
-          title: 'Portfolio / CV',
-          subtitle: portfolioUrl!,
-          url: portfolioUrl!,
+          title: 'Portfolio',
+          subtitle: portfolioUrl!.trim(),
+          url: portfolioUrl!.trim(),
           isConnected: true,
           trailingIcon: Icons.north_east_rounded,
-        )
-      else
+        ),
+      if (linkedinUrl != null && linkedinUrl!.trim().isNotEmpty)
         SocialLinkItem(
-          icon: Icons.language_rounded,
-          title: 'Portfolio Website',
-          subtitle: 'https://$user.dev',
-          url: 'https://$user.dev',
+          icon: Icons.work_outline_rounded,
+          title: 'LinkedIn',
+          subtitle: linkedinUrl!.trim(),
+          url: linkedinUrl!.trim(),
+          isConnected: true,
           trailingIcon: Icons.north_east_rounded,
         ),
-      SocialLinkItem(
-        icon: Icons.work_outline_rounded,
-        title: 'LinkedIn',
-        subtitle: 'in/$user',
-        url: linkedinUrl ?? 'https://www.linkedin.com/in/$user',
-        trailingIcon: Icons.north_east_rounded,
-      ),
     ];
   }
 

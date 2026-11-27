@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:devsync/core/services/firebase/firebase_auth_service.dart';
 import 'package:devsync/core/services/firebase/firebase_constants.dart';
 import 'package:devsync/core/services/firebase/firestore_service.dart';
@@ -9,7 +11,21 @@ import 'package:devsync/features/create_project/data/model/publish_result.dart';
 import 'package:devsync/features/create_project/data/model/team_track.dart';
 import 'package:devsync/features/create_project/data/repositories/builders_repository.dart';
 
+// Thrown when another project already uses the requested title.
+class ProjectTitleTakenException implements Exception {
+  const ProjectTitleTakenException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 abstract class ProjectRepository {
+  Future<bool> isProjectTitleAvailable(
+    String title, {
+    String? excludeProjectId,
+  });
+
   Future<String> saveDraft(
     ProjectDraft draft,
     List<TeamTrack> tracks, {
@@ -36,6 +52,43 @@ class FirestoreProjectRepository implements ProjectRepository {
   final FirestoreService _firestore;
   final FirebaseAuthService _auth;
   final BuildersRepository _builders;
+
+  static const _codeAlphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+  // Generate a short unique human-readable project identifier (e.g. PRJ-7K4M9).
+  String _generateProjectCode() {
+    final rng = Random.secure();
+    final suffix = List.generate(
+      5,
+      (_) => _codeAlphabet[rng.nextInt(_codeAlphabet.length)],
+    ).join();
+    return 'PRJ-$suffix';
+  }
+
+  // Verify no other project already uses the same title (case-insensitive).
+  @override
+  Future<bool> isProjectTitleAvailable(
+    String title, {
+    String? excludeProjectId,
+  }) async {
+    final clean = title.trim().toLowerCase();
+    if (clean.isEmpty) return false;
+    try {
+      final docs = await _firestore.getCollection(
+        collectionPath: FirebaseConstants.projectsCollection,
+      );
+      for (final d in docs) {
+        final docId = (d['id'] ?? '').toString();
+        if (excludeProjectId != null && docId == excludeProjectId) continue;
+        final existing =
+            (d[FirebaseConstants.fieldTitle] ?? '').toString().trim().toLowerCase();
+        if (existing == clean) return false;
+      }
+      return true;
+    } catch (_) {
+      return true;
+    }
+  }
 
   // Fetch owner profile snapshot from Firestore.
   Future<Map<String, dynamic>> _ownerSnapshot(
@@ -88,6 +141,16 @@ class FirestoreProjectRepository implements ProjectRepository {
       return existingProjectId ?? 'draft_${DateTime.now().millisecondsSinceEpoch}';
     }
 
+    final available = await isProjectTitleAvailable(
+      draft.title,
+      excludeProjectId: existingProjectId,
+    );
+    if (!available) {
+      throw const ProjectTitleTakenException(
+        'A project with this name already exists. Please choose a different title.',
+      );
+    }
+
     final snapshot = await _ownerSnapshot(ownerId, draft.ownerTrack);
     final data = {
       ...ProjectFirestoreMapper.projectData(
@@ -97,6 +160,7 @@ class FirestoreProjectRepository implements ProjectRepository {
         ownerId: ownerId,
         ownerSnapshot: snapshot,
       ),
+      if (existingProjectId == null) 'projectCode': _generateProjectCode(),
       if (existingProjectId == null)
         FirebaseConstants.fieldCreatedAt: _firestore.serverTimestamp,
       FirebaseConstants.fieldUpdatedAt: _firestore.serverTimestamp,
@@ -129,6 +193,17 @@ class FirestoreProjectRepository implements ProjectRepository {
     final ownerId = _auth.currentUserId;
 
     if (ownerId != null) {
+      final available = await isProjectTitleAvailable(
+        draft.title,
+        excludeProjectId: existingProjectId,
+      );
+      if (!available) {
+        throw const ProjectTitleTakenException(
+          'A project with this name already exists. Please choose a different title.',
+        );
+      }
+
+      final projectCode = _generateProjectCode();
       final snapshot = await _ownerSnapshot(ownerId, draft.ownerTrack);
       final projectRef = existingProjectId != null
           ? _firestore.documentReference(
@@ -164,6 +239,7 @@ class FirestoreProjectRepository implements ProjectRepository {
             ownerId: ownerId,
             ownerSnapshot: snapshot,
           ),
+          'projectCode': projectCode,
           FirebaseConstants.fieldCreatedAt: _firestore.serverTimestamp,
           FirebaseConstants.fieldUpdatedAt: _firestore.serverTimestamp,
           FirebaseConstants.fieldPublishedAt: _firestore.serverTimestamp,
@@ -174,6 +250,7 @@ class FirestoreProjectRepository implements ProjectRepository {
             draft: draft,
             ownerId: ownerId,
           ),
+          'projectCode': projectCode,
           FirebaseConstants.fieldCreatedAt: _firestore.serverTimestamp,
           FirebaseConstants.fieldUpdatedAt: _firestore.serverTimestamp,
         });
@@ -210,6 +287,12 @@ class FirestoreProjectRepository implements ProjectRepository {
 class MockProjectRepository implements ProjectRepository {
   MockProjectRepository(this._builders);
   final BuildersRepository _builders;
+
+  @override
+  Future<bool> isProjectTitleAvailable(
+    String title, {
+    String? excludeProjectId,
+  }) async => true;
 
   @override
   Future<String> saveDraft(

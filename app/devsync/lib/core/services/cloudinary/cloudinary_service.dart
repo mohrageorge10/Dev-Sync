@@ -24,7 +24,7 @@ class CloudinaryService {
   String get _uploadPreset =>
       (dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '').trim();
 
-  // Upload a PDF résumé to the Cloudinary `cvs` folder and return its secure URL.
+  // Upload a PDF résumé to the Cloudinary `cvs` folder as raw file so delivery is never blocked.
   Future<String> uploadCv({
     required Uint8List bytes,
     required String fileName,
@@ -33,7 +33,7 @@ class CloudinaryService {
     bytes: bytes,
     fileName: fileName,
     folder: FirebaseConstants.cloudinaryCvsFolder,
-    resourceType: 'auto',
+    resourceType: 'raw',
     publicId: uid == null ? null : '${uid}_${DateTime.now().millisecondsSinceEpoch}',
   );
 

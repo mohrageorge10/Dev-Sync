@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:devsync/core/services/firebase/firebase_auth_service.dart';
 import 'package:devsync/core/services/firebase/firebase_constants.dart';
 import 'package:devsync/core/services/firebase/firestore_service.dart';
+import 'package:devsync/core/services/firebase/presence_service.dart';
 import 'package:devsync/features/my_teams/data/models/models.dart';
 import 'package:flutter/material.dart';
 
@@ -56,6 +57,11 @@ class TeamsRepository {
     if (uid == null) return (teams: const <Team>[], tasks: const <TaskItem>[]);
 
     try {
+      // Self-heal: ensure every ongoing project owned by this user has a teams/{projectId} doc,
+      // and every accepted applicant is present in teams/{projectId}/members & memberIds.
+      await _ensureTeamsForOwnedOngoingProjects(uid);
+      await _syncAcceptedApplicantsToTeams(uid);
+
       final teamDocs = await _firestore.getCollection(
         collectionPath: FirebaseConstants.teamsCollection,
         queryBuilder: (q) => q.where(
@@ -83,7 +89,10 @@ class TeamsRepository {
         final memberDocs = await _firestore.getCollection(
           collectionPath: membersPath,
         );
-        final members = memberDocs.map(Member.fromFirestore).toList();
+        final members = _sortMembers(
+          memberDocs.map(Member.fromFirestore).toList(),
+          ownerId: ownerId,
+        );
 
         final taskDocs = await _firestore.getCollection(
           collectionPath: tasksPath,
@@ -156,6 +165,309 @@ class TeamsRepository {
     } catch (_) {
       return (teams: const <Team>[], tasks: const <TaskItem>[]);
     }
+  }
+
+  // Ensure every active/ongoing project owned by uid has a matching teams/{projectId} workspace.
+  Future<void> _ensureTeamsForOwnedOngoingProjects(String uid) async {
+    try {
+      final ownedProjects = await _firestore.getCollection(
+        collectionPath: FirebaseConstants.projectsCollection,
+        queryBuilder: (q) =>
+            q.where(FirebaseConstants.fieldOwnerId, isEqualTo: uid),
+      );
+      if (ownedProjects.isEmpty) return;
+
+      Map<String, dynamic>? ownerDoc;
+      for (final p in ownedProjects) {
+        final pid = (p['id'] ?? '').toString();
+        if (pid.isEmpty) continue;
+        final status =
+            (p[FirebaseConstants.fieldStatus] ?? 'open').toString().toLowerCase();
+        if (status == 'draft' || status == 'completed' || status == 'archived') {
+          continue;
+        }
+
+        final existingTeam = await _firestore.getDocument(
+          collectionPath: FirebaseConstants.teamsCollection,
+          docId: pid,
+        );
+        final rawMemberIds = existingTeam?[FirebaseConstants.fieldMemberIds];
+        final hasOwner = rawMemberIds is Iterable &&
+            rawMemberIds.map((e) => e.toString()).contains(uid);
+        if (existingTeam != null && hasOwner) continue;
+
+        ownerDoc ??= await _firestore.getDocument(
+          collectionPath: FirebaseConstants.usersCollection,
+          docId: uid,
+        );
+        final ownerName =
+            (ownerDoc?[FirebaseConstants.fieldName] ?? currentUserName)
+                .toString();
+        final ownerHandle = (ownerDoc?[FirebaseConstants.fieldPublicId] ??
+                ownerName.toLowerCase().replaceAll(' ', ''))
+            .toString();
+        final ownerTrack =
+            (ownerDoc?[FirebaseConstants.fieldTrack] ?? 'Owner').toString();
+
+        await _firestore.setDocument(
+          collectionPath: FirebaseConstants.teamsCollection,
+          docId: pid,
+          data: {
+            FirebaseConstants.fieldProjectId: pid,
+            FirebaseConstants.fieldProjectTitle:
+                (p[FirebaseConstants.fieldTitle] ?? 'Team Workspace')
+                    .toString(),
+            FirebaseConstants.fieldOwnerId: uid,
+            FirebaseConstants.fieldMemberIds: FieldValue.arrayUnion([uid]),
+            FirebaseConstants.fieldTeamSize:
+                (p[FirebaseConstants.fieldTeamSize] is num)
+                    ? (p[FirebaseConstants.fieldTeamSize] as num).toInt()
+                    : 4,
+            if (p[FirebaseConstants.fieldOpenTrackKeys] != null)
+              FirebaseConstants.fieldOpenTrackKeys:
+                  p[FirebaseConstants.fieldOpenTrackKeys],
+            if (p[FirebaseConstants.fieldExpectedEndDate] != null)
+              FirebaseConstants.fieldExpectedEndDate:
+                  p[FirebaseConstants.fieldExpectedEndDate],
+            if (p['repoUrl'] != null) 'repoUrl': p['repoUrl'],
+            if (p['defaultBranch'] != null) 'defaultBranch': p['defaultBranch'],
+            FirebaseConstants.fieldUpdatedAt: _firestore.serverTimestamp,
+            if (existingTeam == null)
+              FirebaseConstants.fieldCreatedAt: _firestore.serverTimestamp,
+          },
+          merge: true,
+        );
+
+        await _firestore.setDocument(
+          collectionPath:
+              '${FirebaseConstants.teamsCollection}/$pid/${FirebaseConstants.membersCollection}',
+          docId: uid,
+          data: {
+            FirebaseConstants.fieldUid: uid,
+            FirebaseConstants.fieldName: ownerName,
+            'username': ownerHandle,
+            FirebaseConstants.fieldTrack: ownerTrack,
+            'teamRole': 'owner',
+            FirebaseConstants.fieldJoinedAt: _firestore.serverTimestamp,
+          },
+          merge: true,
+        );
+      }
+    } catch (_) {}
+  }
+
+  // Ensure every accepted join request for this owner's projects has a member doc in teams/{pid}/members.
+  Future<void> _syncAcceptedApplicantsToTeams(String uid) async {
+    try {
+      final accepted = await _firestore.getCollection(
+        collectionPath: FirebaseConstants.requestsCollection,
+        queryBuilder: (q) => q
+            .where(FirebaseConstants.fieldOwnerId, isEqualTo: uid)
+            .where(FirebaseConstants.fieldStatus, isEqualTo: 'accepted'),
+      );
+      if (accepted.isEmpty) return;
+
+      for (final req in accepted) {
+        final pid = (req[FirebaseConstants.fieldProjectId] ?? '').toString();
+        final applicantUid =
+            (req[FirebaseConstants.fieldApplicantId] ?? '').toString();
+        if (pid.isEmpty || applicantUid.isEmpty) continue;
+
+        final membersPath =
+            '${FirebaseConstants.teamsCollection}/$pid/${FirebaseConstants.membersCollection}';
+        final existingMember = await _firestore.getDocument(
+          collectionPath: membersPath,
+          docId: applicantUid,
+        );
+
+        if (existingMember == null) {
+          final snap = req[FirebaseConstants.fieldApplicantSnapshot] is Map
+              ? Map<String, dynamic>.from(
+                  req[FirebaseConstants.fieldApplicantSnapshot] as Map,
+                )
+              : const <String, dynamic>{};
+          final userDoc = await _firestore.getDocument(
+            collectionPath: FirebaseConstants.usersCollection,
+            docId: applicantUid,
+          );
+          final name = (userDoc?[FirebaseConstants.fieldName] ??
+                  snap[FirebaseConstants.fieldName] ??
+                  'Member')
+              .toString();
+          final handle = (userDoc?[FirebaseConstants.fieldPublicId] ??
+                  snap[FirebaseConstants.fieldPublicId] ??
+                  name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), ''))
+              .toString();
+          final track = (req[FirebaseConstants.fieldTrack] ??
+                  userDoc?[FirebaseConstants.fieldTrack] ??
+                  'Member')
+              .toString();
+
+          await _firestore.setDocument(
+            collectionPath: membersPath,
+            docId: applicantUid,
+            data: {
+              FirebaseConstants.fieldUid: applicantUid,
+              FirebaseConstants.fieldName: name,
+              'username': handle,
+              FirebaseConstants.fieldTrack: track,
+              'teamRole': 'member',
+              FirebaseConstants.fieldIsOwner: false,
+              FirebaseConstants.fieldJoinedAt: _firestore.serverTimestamp,
+            },
+            merge: true,
+          );
+        }
+
+        await _firestore.setDocument(
+          collectionPath: FirebaseConstants.teamsCollection,
+          docId: pid,
+          data: {
+            FirebaseConstants.fieldMemberIds: FieldValue.arrayUnion([
+              applicantUid,
+            ]),
+            FirebaseConstants.fieldUpdatedAt: _firestore.serverTimestamp,
+          },
+          merge: true,
+        );
+      }
+    } catch (_) {}
+  }
+
+  // Real-time stream of team documents where the current user is a member.
+  Stream<List<Map<String, dynamic>>> watchTeamDocs() {
+    final uid = _auth.currentUserId;
+    if (uid == null) return const Stream.empty();
+    return _firestore.collectionStream(
+      collectionPath: FirebaseConstants.teamsCollection,
+      queryBuilder: (q) => q.where(
+        FirebaseConstants.fieldMemberIds,
+        arrayContains: uid,
+      ),
+    );
+  }
+
+  // Real-time stream of members for a specific team.
+  Stream<List<Member>> watchTeamMembers(String teamId) {
+    return _firestore
+        .collectionStream(
+          collectionPath:
+              '${FirebaseConstants.teamsCollection}/$teamId/${FirebaseConstants.membersCollection}',
+        )
+        .map((docs) => docs.map(Member.fromFirestore).toList());
+  }
+
+  // Real-time stream of raw task docs for a specific team.
+  Stream<List<Map<String, dynamic>>> watchTeamTaskDocs(String teamId) {
+    return _firestore.collectionStream(
+      collectionPath:
+          '${FirebaseConstants.teamsCollection}/$teamId/${FirebaseConstants.tasksCollection}',
+    );
+  }
+
+  // Real-time stream of currently online user IDs.
+  Stream<Set<String>> watchOnlineUserIds() {
+    return _firestore
+        .collectionStream(
+          collectionPath: FirebaseConstants.usersCollection,
+          queryBuilder: (q) =>
+              q.where(FirebaseConstants.fieldIsOnline, isEqualTo: true),
+        )
+        .map((docs) {
+          final online = <String>{};
+          for (final d in docs) {
+            final uid = (d['id'] ?? d[FirebaseConstants.fieldUid] ?? '')
+                .toString();
+            if (uid.isEmpty) continue;
+            final rawLast = d[FirebaseConstants.fieldLastSeen];
+            DateTime? lastSeen;
+            if (rawLast is Timestamp) lastSeen = rawLast.toDate();
+            if (PresenceService.isRecentlyOnline(true, lastSeen)) {
+              online.add(uid);
+            }
+          }
+          return online;
+        });
+  }
+
+  // Sort team members so Owner is always first, then Track Leaders, then Members.
+  List<Member> _sortMembers(List<Member> members, {required String ownerId}) {
+    int rank(Member m) {
+      if ((ownerId.isNotEmpty && m.id == ownerId) ||
+          m.effectiveRole == TeamRole.owner) {
+        return 0;
+      }
+      if (m.effectiveRole == TeamRole.trackLeader) return 1;
+      return 2;
+    }
+
+    final sorted = List<Member>.from(members);
+    sorted.sort((a, b) {
+      final cmp = rank(a).compareTo(rank(b));
+      if (cmp != 0) return cmp;
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    return sorted;
+  }
+
+  // Build a Team model from a Firestore doc + current member list.
+  Team teamFromDoc(
+    Map<String, dynamic> doc, {
+    required List<Member> members,
+    required String uid,
+  }) {
+    final teamId = (doc['id'] ?? '').toString();
+    final ownerId = (doc[FirebaseConstants.fieldOwnerId] ?? '').toString();
+    final sortedMembers = _sortMembers(members, ownerId: ownerId);
+    final myMember = sortedMembers.where((m) => m.id == uid).firstOrNull;
+    final myRole = ownerId == uid
+        ? TeamRole.owner
+        : (myMember?.effectiveRole ?? TeamRole.member);
+
+    final rawEnd = doc[FirebaseConstants.fieldExpectedEndDate];
+    DateTime? endDate;
+    if (rawEnd is Timestamp) {
+      endDate = rawEnd.toDate();
+    } else if (rawEnd is String) {
+      endDate = DateTime.tryParse(rawEnd);
+    }
+
+    final rawSettings = doc['settings'];
+    final settings = TeamSettings.fromMap(
+      rawSettings is Map ? Map<String, dynamic>.from(rawSettings) : null,
+    );
+
+    final rawTracks =
+        doc[FirebaseConstants.fieldTrackKeys] ??
+        doc[FirebaseConstants.fieldOpenTrackKeys];
+    final projectTracks = <String>[
+      if (rawTracks is Iterable)
+        for (final t in rawTracks) t.toString(),
+    ];
+
+    return Team(
+      id: teamId,
+      name: (doc[FirebaseConstants.fieldProjectTitle] ??
+              doc[FirebaseConstants.fieldName] ??
+              'Team Workspace')
+          .toString(),
+      subtitle: (doc['subtitle'] ?? 'Active • Real-world').toString(),
+      role: myRole.shortLabel,
+      sprint: (doc['sprint'] ?? 'Active Sprint').toString(),
+      icon: Icons.workspaces_outline,
+      members: sortedMembers,
+      totalSeats: (doc[FirebaseConstants.fieldTeamSize] is num)
+          ? (doc[FirebaseConstants.fieldTeamSize] as num).toInt()
+          : (sortedMembers.length < 4 ? 4 : sortedMembers.length),
+      openRoles: const [],
+      version: (doc['version'] ?? 'v1.0.0').toString(),
+      repoUrl: (doc['repoUrl'] ?? 'https://github.com/devsync/project')
+          .toString(),
+      ownerId: ownerId,
+      expectedEndDate: endDate,
+      settings: settings,
+      projectTracks: projectTracks,
+    );
   }
 
   // Persist workspace metadata & role permissions to teams/{teamId} and mirror to projects/{teamId}.

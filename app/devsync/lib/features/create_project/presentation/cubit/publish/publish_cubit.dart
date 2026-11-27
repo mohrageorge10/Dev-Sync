@@ -37,6 +37,8 @@ class PublishCubit extends Cubit<PublishState> {
         ServiceLocator.get<MyProjectsCubit>().loadData();
       }
       return null;
+    } on ProjectTitleTakenException catch (e) {
+      return e.message;
     } catch (e) {
       return FirebaseErrorHandler.handle(e);
     }
@@ -63,6 +65,9 @@ class PublishCubit extends Cubit<PublishState> {
         ServiceLocator.get<DiscoverCubit>().loadData();
       }
       emit(PublishSuccess(result));
+    } on ProjectTitleTakenException catch (e) {
+      if (isClosed) return;
+      emit(PublishFailure(e.message));
     } catch (e) {
       if (isClosed) return;
       emit(PublishFailure(FirebaseErrorHandler.handle(e)));

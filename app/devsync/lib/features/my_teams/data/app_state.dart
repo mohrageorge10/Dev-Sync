@@ -1,13 +1,20 @@
+import 'dart:async';
+
 import 'package:devsync/core/di/service_locator.dart';
 import 'package:devsync/features/my_projects/presentation/cubit/my_projects_cubit.dart';
 import 'package:devsync/features/my_teams/data/models/models.dart';
 import 'package:devsync/features/my_teams/data/repositories/teams_repository.dart';
 import 'package:flutter/material.dart';
 
-// Central state controller for My Teams, Task Board, Role-Based Permissions, and Firestore sync.
+// Central state controller for My Teams, Task Board, Role-Based Permissions, and real-time Firestore sync.
 class TeamsController extends ChangeNotifier {
   TeamsController({TeamsRepository? repository}) : _repository = repository {
-    _seedFallback();
+    me = const Member(
+      id: 'guest',
+      name: 'Developer',
+      handle: '@developer',
+      role: 'Contributor',
+    );
   }
 
   final TeamsRepository? _repository;
@@ -18,9 +25,24 @@ class TeamsController extends ChangeNotifier {
   late Member me;
   final List<Team> _teams = [];
   final List<TaskItem> _tasks = [];
+  Set<String> _onlineUserIds = {};
   int _nextNumber = 104;
 
+  // Real-time stream subscriptions (cleaned up on reset/dispose).
+  StreamSubscription<List<Map<String, dynamic>>>? _teamsSub;
+  StreamSubscription<Set<String>>? _onlineSub;
+  final Map<String, StreamSubscription<List<Member>>> _memberSubs = {};
+  final Map<String, StreamSubscription<List<Map<String, dynamic>>>> _taskSubs =
+      {};
+  final Map<String, Map<String, dynamic>> _rawTeamDocs = {};
+  final Map<String, List<Member>> _liveMembers = {};
+  final Map<String, List<Map<String, dynamic>>> _rawTaskDocs = {};
+
   List<Team> get teams => List.unmodifiable(_teams);
+
+  // Whether a team member is currently online.
+  bool isMemberOnline(String memberId) =>
+      memberId == me.id || _onlineUserIds.contains(memberId);
 
   // Safe lookups returning null if a team or task was deleted/left.
   Team? findTeamById(String id) => _teams.where((t) => t.id == id).firstOrNull;
@@ -123,28 +145,157 @@ class TeamsController extends ChangeNotifier {
       final fetchedMe = await repo.fetchCurrentMember();
       me = fetchedMe;
       final data = await repo.fetchTeamsAndTasks();
-      if (data.teams.isNotEmpty) {
-        _teams
-          ..clear()
-          ..addAll(data.teams);
-        _tasks
-          ..clear()
-          ..addAll(data.tasks);
-        final maxNum = _tasks.fold<int>(
-          0,
-          (prev, t) => t.number > prev ? t.number : prev,
-        );
-        if (maxNum >= _nextNumber) _nextNumber = maxNum + 1;
-      } else {
-        _seedFallback(currentUser: fetchedMe);
-      }
+      _teams
+        ..clear()
+        ..addAll(data.teams);
+      _tasks
+        ..clear()
+        ..addAll(data.tasks);
+      final maxNum = _tasks.fold<int>(
+        0,
+        (prev, t) => t.number > prev ? t.number : prev,
+      );
+      if (maxNum >= _nextNumber) _nextNumber = maxNum + 1;
       _hasLoaded = true;
+      _startRealtimeStreams();
     } catch (_) {
-      _seedFallback();
     } finally {
       isLoading = false;
       notifyListeners();
     }
+  }
+
+  // Subscribe to real-time Firestore streams for teams, members, tasks, and online users.
+  void _startRealtimeStreams() {
+    final repo = _repository;
+    final uid = repo?.currentUserId;
+    if (repo == null || uid == null) return;
+
+    _cancelStreams();
+
+    _onlineSub = repo.watchOnlineUserIds().listen(
+      (ids) {
+        Timer.run(() {
+          _onlineUserIds = ids;
+          notifyListeners();
+        });
+      },
+      onError: (_) {},
+    );
+
+    _teamsSub = repo.watchTeamDocs().listen(
+      (docs) {
+        Timer.run(() {
+          final activeIds = <String>{};
+          for (final doc in docs) {
+            final teamId = (doc['id'] ?? '').toString();
+            if (teamId.isEmpty) continue;
+            activeIds.add(teamId);
+            _rawTeamDocs[teamId] = doc;
+
+            if (!_memberSubs.containsKey(teamId)) {
+              _memberSubs[teamId] = repo.watchTeamMembers(teamId).listen(
+                (members) {
+                  Timer.run(() {
+                    _liveMembers[teamId] = members;
+                    _rebuildFromStreams(uid);
+                  });
+                },
+                onError: (_) {},
+              );
+            }
+            if (!_taskSubs.containsKey(teamId)) {
+              _taskSubs[teamId] = repo.watchTeamTaskDocs(teamId).listen(
+                (taskDocs) {
+                  Timer.run(() {
+                    _rawTaskDocs[teamId] = taskDocs;
+                    _rebuildFromStreams(uid);
+                  });
+                },
+                onError: (_) {},
+              );
+            }
+          }
+
+          // Clean up subscriptions for teams the user left or that were deleted.
+          final staleIds = _memberSubs.keys
+              .where((id) => !activeIds.contains(id))
+              .toList();
+          for (final stale in staleIds) {
+            _memberSubs.remove(stale)?.cancel();
+            _taskSubs.remove(stale)?.cancel();
+            _rawTeamDocs.remove(stale);
+            _liveMembers.remove(stale);
+            _rawTaskDocs.remove(stale);
+          }
+
+          _rebuildFromStreams(uid);
+        });
+      },
+      onError: (_) {},
+    );
+  }
+
+  void _rebuildFromStreams(String uid) {
+    final repo = _repository;
+    if (repo == null) return;
+
+    final nextTeams = <Team>[];
+    final nextTasks = <TaskItem>[];
+
+    for (final entry in _rawTeamDocs.entries) {
+      final teamId = entry.key;
+      final existing = findTeamById(teamId);
+      final members = _liveMembers[teamId] ?? existing?.members ?? const <Member>[];
+      nextTeams.add(repo.teamFromDoc(entry.value, members: members, uid: uid));
+
+      final taskDocs = _rawTaskDocs[teamId];
+      if (taskDocs != null) {
+        for (var i = 0; i < taskDocs.length; i++) {
+          nextTasks.add(
+            TaskItem.fromFirestore(
+              taskDocs[i],
+              teamId: teamId,
+              members: members,
+              fallbackNumber: i + 1,
+            ),
+          );
+        }
+      } else {
+        nextTasks.addAll(_tasks.where((t) => t.teamId == teamId));
+      }
+    }
+
+    _teams
+      ..clear()
+      ..addAll(nextTeams);
+    _tasks
+      ..clear()
+      ..addAll(nextTasks);
+    final maxNum = _tasks.fold<int>(
+      0,
+      (prev, t) => t.number > prev ? t.number : prev,
+    );
+    if (maxNum >= _nextNumber) _nextNumber = maxNum + 1;
+    notifyListeners();
+  }
+
+  void _cancelStreams() {
+    _teamsSub?.cancel();
+    _teamsSub = null;
+    _onlineSub?.cancel();
+    _onlineSub = null;
+    for (final s in _memberSubs.values) {
+      s.cancel();
+    }
+    _memberSubs.clear();
+    for (final s in _taskSubs.values) {
+      s.cancel();
+    }
+    _taskSubs.clear();
+    _rawTeamDocs.clear();
+    _liveMembers.clear();
+    _rawTaskDocs.clear();
   }
 
   // Sync a newly accepted member from My Projects into the matching team.
@@ -425,263 +576,27 @@ class TeamsController extends ChangeNotifier {
     await _repository?.leaveTeam(id);
   }
 
-  // Reset user-scoped state on sign-out.
+  // Reset user-scoped state and cancel real-time streams on sign-out.
   void reset() {
+    _cancelStreams();
     _hasLoaded = false;
+    _onlineUserIds = {};
     _teams.clear();
     _tasks.clear();
     _nextNumber = 104;
-    _seedFallback();
+    me = const Member(
+      id: 'guest',
+      name: 'Developer',
+      handle: '@developer',
+      role: 'Contributor',
+    );
     notifyListeners();
   }
 
-  // Seed initial showcase data when no Firestore teams exist yet.
-  void _seedFallback({Member? currentUser}) {
-    me =
-        currentUser ??
-        const Member(
-          id: 'u1',
-          name: 'Alex Rivera',
-          handle: '@alexrivera',
-          role: 'Project Owner & BLE Lead',
-          teamRole: TeamRole.owner,
-        );
-    final ownerMe = Member(
-      id: me.id,
-      name: me.name,
-      handle: me.handle,
-      role: me.role,
-      teamRole: TeamRole.owner,
-    );
-    const sarah = Member(
-      id: 'u2',
-      name: 'Sarah Lin',
-      handle: '@sarahlin_dev',
-      role: 'UI/UX & Design Systems',
-      teamRole: TeamRole.trackLeader,
-      leaderTrack: 'UI/UX',
-    );
-    const marcus = Member(
-      id: 'u3',
-      name: 'Marcus Vance',
-      handle: '@marcus_v',
-      role: 'Flutter Client & State',
-      teamRole: TeamRole.member,
-    );
-    const sofia = Member(
-      id: 'u4',
-      name: 'Sofia Chen',
-      handle: '@sofia_c',
-      role: 'QA & Test Automation',
-      teamRole: TeamRole.member,
-    );
-
-    final now = DateTime.now();
-
-    _teams
-      ..clear()
-      ..addAll([
-        Team(
-          id: 'eco',
-          name: 'EcoTrack Mobile',
-          subtitle: 'Active • Real-world',
-          role: TeamRole.owner.shortLabel,
-          sprint: 'Sprint 2',
-          icon: Icons.eco_outlined,
-          members: [ownerMe, sarah, marcus],
-          totalSeats: 5,
-          version: 'v2.4.0',
-          repoUrl: 'https://github.com/ecotrack/mobile',
-          ownerId: me.id,
-          expectedEndDate: now.add(const Duration(days: 8)),
-          projectTracks: const ['Flutter', 'Backend', 'UI/UX', 'QA'],
-          openRoles: const [
-            OpenRole(
-              title: 'Backend / SQLite Architect',
-              description:
-                  'Local-first sync engine & telemetry persistence layer',
-              level: 'Intermediate',
-              hours: '8 hrs/wk',
-              tech: 'SQLite & Drift',
-            ),
-            OpenRole(
-              title: 'Integration & QA Contributor',
-              description:
-                  'Automated unit test runs, widget harnesses & edge cases',
-              level: 'Beginner friendly',
-              hours: '4 hrs/wk',
-              tech: 'Integration Testing',
-            ),
-          ],
-        ),
-        Team(
-          id: 'algo',
-          name: 'AlgoViz Flutter',
-          subtitle: 'Active • Learning',
-          role: TeamRole.member.shortLabel,
-          sprint: 'v1.2 Release',
-          icon: Icons.account_tree_outlined,
-          members: [
-            sarah.copyWith(teamRole: TeamRole.owner),
-            marcus.copyWith(teamRole: TeamRole.trackLeader),
-            me.copyWith(teamRole: TeamRole.member),
-          ],
-          totalSeats: 4,
-          version: 'v1.2.0',
-          repoUrl: 'https://github.com/algoviz/flutter',
-          ownerId: sarah.id,
-          expectedEndDate: now.add(const Duration(days: 14)),
-          openRoles: const [],
-        ),
-      ]);
-
-    _tasks
-      ..clear()
-      ..addAll([
-        TaskItem(
-          id: 't12',
-          teamId: 'eco',
-          number: 12,
-          title: 'Refactor BLE background isolate connection lifecycle',
-          description: 'Ensure persistent peripheral handshake reconnects cleanly when Android battery saver triggers deep doze.',
-          priority: Priority.high,
-          status: TaskStatus.inProgress,
-          assignee: ownerMe,
-          dueDate: now.add(const Duration(days: 2)),
-          tag: 'Architecture',
-          epic: 'BLE & STATE MANAGEMENT',
-          codePath: 'lib/core/ble/isolate_worker.dart',
-          criteria: [
-            Criterion('StreamController closed on dispose', done: true),
-            Criterion('GATT disconnect timeout verified (5s)'),
-            Criterion('Tested on Android 14 physical device'),
-          ],
-          comment: 'Added the missing GATT disconnect timeout spec...',
-          commentBy: 'Sofia Chen',
-        ),
-        TaskItem(
-          id: 't14',
-          teamId: 'eco',
-          number: 14,
-          title: 'Implement telemetry sync charts with FL Chart',
-          description: 'Render kilowatt-hour smoothing spline with real-time scrub interaction & export vector snapshots.',
-          priority: Priority.medium,
-          status: TaskStatus.inProgress,
-          assignee: sarah,
-          dueDate: now.add(const Duration(days: 8)),
-          tag: 'UI/UX',
-          epic: 'TELEMETRY',
-          criteria: [
-            Criterion('Chart scrubs at 60fps', done: true),
-            Criterion('Export snapshot as PNG'),
-          ],
-        ),
-        TaskItem(
-          id: 't16',
-          teamId: 'eco',
-          number: 16,
-          title: 'Profile SQLite WAL mode buffer allocations on cold start',
-          priority: Priority.low,
-          status: TaskStatus.todo,
-          tag: 'Performance',
-          epic: 'PERFORMANCE',
-        ),
-        TaskItem(
-          id: 't17',
-          teamId: 'eco',
-          number: 17,
-          title: 'Add dark mode tokens to design system',
-          description: 'Map semantic color tokens for dark surfaces.',
-          priority: Priority.medium,
-          status: TaskStatus.todo,
-          assignee: sarah,
-          dueDate: now.add(const Duration(days: 12)),
-          tag: 'UI/UX',
-          epic: 'DESIGN SYSTEM',
-        ),
-        TaskItem(
-          id: 't18',
-          teamId: 'eco',
-          number: 18,
-          title: 'Write widget tests for onboarding flow',
-          priority: Priority.low,
-          status: TaskStatus.todo,
-          assignee: sofia,
-          dueDate: now.add(const Duration(days: 6)),
-          tag: 'Testing',
-          epic: 'QUALITY',
-        ),
-        TaskItem(
-          id: 't11',
-          teamId: 'eco',
-          number: 11,
-          title: 'Migrate state layer to ChangeNotifier',
-          description:
-              'Replace ad-hoc setState usage with a single source of truth.',
-          priority: Priority.high,
-          status: TaskStatus.inReview,
-          assignee: marcus,
-          dueDate: now.add(const Duration(days: 1)),
-          tag: 'Architecture',
-          epic: 'BLE & STATE MANAGEMENT',
-          prUrl: 'https://github.com/ecotrack/mobile/pull/42',
-          criteria: [
-            Criterion('All screens migrated', done: true),
-            Criterion('Unit tests passing', done: true),
-          ],
-        ),
-        TaskItem(
-          id: 't9',
-          teamId: 'eco',
-          number: 9,
-          title: 'Set up CI pipeline',
-          priority: Priority.medium,
-          status: TaskStatus.done,
-          assignee: ownerMe,
-          tag: 'DevOps',
-          epic: 'INFRA',
-        ),
-        TaskItem(
-          id: 'a3',
-          teamId: 'algo',
-          number: 3,
-          title: 'Animate quick sort partitions',
-          description:
-              'Highlight pivot swaps and partition boundaries smoothly.',
-          priority: Priority.medium,
-          status: TaskStatus.inProgress,
-          assignee: me,
-          dueDate: now.add(const Duration(days: 4)),
-          tag: 'Visualization',
-          epic: 'SORTING',
-          criteria: [
-            Criterion('Pivot color transition smooth', done: true),
-            Criterion('Supports pause and step-back'),
-          ],
-        ),
-        TaskItem(
-          id: 'a4',
-          teamId: 'algo',
-          number: 4,
-          title: 'Add speed slider to playback controls',
-          priority: Priority.low,
-          status: TaskStatus.todo,
-          assignee: me,
-          tag: 'UI/UX',
-          epic: 'PLAYBACK',
-        ),
-        TaskItem(
-          id: 'a5',
-          teamId: 'algo',
-          number: 5,
-          title: 'Benchmark merge sort memory usage',
-          priority: Priority.medium,
-          status: TaskStatus.todo,
-          assignee: marcus,
-          tag: 'Performance',
-          epic: 'SORTING',
-        ),
-      ]);
+  @override
+  void dispose() {
+    _cancelStreams();
+    super.dispose();
   }
 }
 

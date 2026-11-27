@@ -368,6 +368,9 @@ class ReviewPublishScreen extends StatelessWidget {
                         : AppFeedbackType.success,
                     fromTop: err != null,
                   );
+                  if (err == null && Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  }
                 },
               ),
             ),

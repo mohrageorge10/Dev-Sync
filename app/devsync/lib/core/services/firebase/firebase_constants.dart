@@ -76,6 +76,8 @@ abstract final class FirebaseConstants {
   static const String fieldBehanceUrl = 'behanceUrl';
   static const String fieldGithubUsername = 'githubUsername';
   static const String fieldGithubConnected = 'githubConnected';
+  static const String fieldIsOnline = 'isOnline';
+  static const String fieldLastSeen = 'lastSeen';
 
   // ================= Language and Skill Fields =================
 

@@ -100,11 +100,13 @@ class MemberTile extends StatelessWidget {
     super.key,
     required this.member,
     this.isMe = false,
+    this.isOnline = false,
     this.onManageTap,
   });
 
   final Member member;
   final bool isMe;
+  final bool isOnline;
   final VoidCallback? onManageTap;
 
   @override
@@ -125,7 +127,29 @@ class MemberTile extends StatelessWidget {
     return AppCard(
       child: Row(
         children: [
-          Avatar(member.initials, size: 40),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Avatar(member.initials, size: 40),
+              if (isOnline)
+                Positioned(
+                  right: -1,
+                  bottom: -1,
+                  child: Container(
+                    width: 11,
+                    height: 11,
+                    decoration: BoxDecoration(
+                      color: c.success,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: c.backgroundPrimary,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

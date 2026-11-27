@@ -7,6 +7,7 @@ import 'package:devsync/core/services/firebase/firebase_auth_service.dart';
 import 'package:devsync/core/shared/app_bar/devsync_logo.dart';
 import 'package:devsync/core/theme/app_colors.dart';
 import 'package:devsync/core/theme/app_styles.dart';
+import 'package:devsync/features/profile/presentation/cubit/profile_controller.dart';
 import 'package:flutter/material.dart';
 
 // Entry splash screen that routes users based on onboarding and auth state.
@@ -34,14 +35,23 @@ class _SplashState extends State<Splash> {
         CacheHelper.getData<bool>(key: Splash.seenOnboardingKey) ?? false;
     final isSignedIn = ServiceLocator.get<FirebaseAuthService>().isSignedIn;
 
+    String targetRoute;
+    if (!seenOnboarding) {
+      targetRoute = AppRoutes.onBoarding;
+    } else if (!isSignedIn) {
+      targetRoute = AppRoutes.authEntry;
+    } else {
+      targetRoute = AppRoutes.main;
+      if (ServiceLocator.isRegistered<ProfileController>()) {
+        final profile = ServiceLocator.get<ProfileController>();
+        await profile.loadProfile(force: true);
+        if (!profile.isCoreProfileComplete) {
+          targetRoute = AppRoutes.profileBasicInfo;
+        }
+      }
+    }
+
     if (!mounted) return;
-
-    final targetRoute = !seenOnboarding
-        ? AppRoutes.onBoarding
-        : isSignedIn
-        ? AppRoutes.main
-        : AppRoutes.authEntry;
-
     Navigator.pushReplacementNamed(context, targetRoute);
   }
 

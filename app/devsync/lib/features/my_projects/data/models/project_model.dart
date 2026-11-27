@@ -86,10 +86,12 @@ class ProjectModel {
     this.repoUrl = '',
     this.cloneUrl = '',
     this.defaultBranch = 'develop',
+    this.projectCode = '',
     this.gitRules = const GitWorkflowRules(),
   });
 
   final String id;
+  final String projectCode;
   String name;
   String description;
   String statusText;

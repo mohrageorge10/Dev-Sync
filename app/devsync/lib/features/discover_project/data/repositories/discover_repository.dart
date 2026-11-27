@@ -4,9 +4,7 @@ import 'package:devsync/core/services/firebase/firestore_service.dart';
 import 'package:devsync/core/utils/devsync_enums.dart';
 import 'package:devsync/features/create_project/data/model/enums.dart';
 import 'package:devsync/features/discover_project/data/model/developer_model.dart';
-import 'package:devsync/features/discover_project/data/model/developers_data.dart';
 import 'package:devsync/features/discover_project/data/model/project_model.dart';
-import 'package:devsync/features/discover_project/data/model/projects_data.dart';
 
 // Unified repository for discovering projects, developers, bookmarks, applications, and invites.
 class DiscoverRepository {
@@ -120,37 +118,102 @@ class DiscoverRepository {
   // Current authenticated user ID.
   String? get currentUserId => _auth.currentUserId;
 
-  // Fetch non-draft projects from Firestore with local fallback.
+  // Fetch non-draft projects from Firestore (real data only).
   Future<List<ProjectModel>> fetchProjects() async {
     try {
       final docs = await _firestore.getCollection(
         collectionPath: FirebaseConstants.projectsCollection,
       );
-      final mapped = docs
+      return docs
           .where(
             (d) => d[FirebaseConstants.fieldStatus] != ProjectStatus.draft.name,
           )
           .map(ProjectModel.fromFirestore)
           .toList();
-      if (mapped.isNotEmpty) return mapped;
-    } catch (_) {}
-    return projectsData;
+    } catch (_) {
+      return const [];
+    }
   }
 
-  // Fetch developers from Firestore with local fallback.
+  // Fetch developers from Firestore (real data only).
   Future<List<DeveloperModel>> fetchDevelopers() async {
     try {
       final docs = await _firestore.getCollection(
         collectionPath: FirebaseConstants.usersCollection,
       );
       final uid = _auth.currentUserId;
-      final mapped = docs
+      return docs
           .where((d) => (d['id'] ?? d[FirebaseConstants.fieldUid]) != uid)
           .map(DeveloperModel.fromFirestore)
           .toList();
-      if (mapped.isNotEmpty) return mapped;
-    } catch (_) {}
-    return developersData;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  // Real-time stream of non-draft projects in Firestore.
+  Stream<List<ProjectModel>> watchProjects() {
+    return _firestore
+        .collectionStream(collectionPath: FirebaseConstants.projectsCollection)
+        .map(
+          (docs) => docs
+              .where(
+                (d) =>
+                    d[FirebaseConstants.fieldStatus] !=
+                    ProjectStatus.draft.name,
+              )
+              .map(ProjectModel.fromFirestore)
+              .toList(),
+        );
+  }
+
+  // Real-time stream of discoverable developers (including live online presence).
+  Stream<List<DeveloperModel>> watchDevelopers() {
+    final uid = _auth.currentUserId;
+    return _firestore
+        .collectionStream(collectionPath: FirebaseConstants.usersCollection)
+        .map(
+          (docs) => docs
+              .where((d) => (d['id'] ?? d[FirebaseConstants.fieldUid]) != uid)
+              .map(DeveloperModel.fromFirestore)
+              .toList(),
+        );
+  }
+
+  // Real-time stream of saved project/developer IDs for the current user.
+  Stream<Set<String>> watchSavedIds() {
+    final uid = _auth.currentUserId;
+    if (uid == null) return const Stream.empty();
+    return _firestore
+        .collectionStream(
+          collectionPath:
+              '${FirebaseConstants.usersCollection}/$uid/${FirebaseConstants.savedCollection}',
+        )
+        .map((docs) => docs.map((d) => (d['id'] ?? '').toString()).toSet());
+  }
+
+  // Real-time stream of project IDs the current user has active requests on.
+  Stream<Set<String>> watchAppliedProjectIds() {
+    final uid = _auth.currentUserId;
+    if (uid == null) return const Stream.empty();
+    return _firestore
+        .collectionStream(
+          collectionPath: FirebaseConstants.requestsCollection,
+          queryBuilder: (q) =>
+              q.where(FirebaseConstants.fieldApplicantId, isEqualTo: uid),
+        )
+        .map(
+          (docs) => docs
+              .where((d) {
+                final status = (d[FirebaseConstants.fieldStatus] ?? 'pending')
+                    .toString()
+                    .toLowerCase();
+                return status == 'pending' || status == 'accepted';
+              })
+              .map((d) => (d[FirebaseConstants.fieldProjectId] ?? '').toString())
+              .where((id) => id.isNotEmpty)
+              .toSet(),
+        );
   }
 
   // Fetch saved project and developer IDs for current user.
@@ -232,18 +295,32 @@ class DiscoverRepository {
     } catch (_) {}
   }
 
-  // Submit join request to requests/{projectId}_{applicantId}.
+  // Submit join request to requests/{projectId}_{applicantId} with ownerId for real-time delivery.
   Future<void> applyToProject(String projectId, {String? projectTitle}) async {
     final uid = _auth.currentUserId;
     if (uid == null) return;
     try {
-      final userDoc = await _firestore.getDocument(
-        collectionPath: FirebaseConstants.usersCollection,
-        docId: uid,
-      );
-      final track = UserTrackX.fromName(
-        userDoc?[FirebaseConstants.fieldTrack]?.toString(),
-      );
+      final results = await Future.wait([
+        _firestore.getDocument(
+          collectionPath: FirebaseConstants.usersCollection,
+          docId: uid,
+        ),
+        _firestore.getDocument(
+          collectionPath: FirebaseConstants.projectsCollection,
+          docId: projectId,
+        ),
+      ]);
+      final userDoc = results[0];
+      final projectDoc = results[1];
+      final ownerId =
+          (projectDoc?[FirebaseConstants.fieldOwnerId] ?? '').toString();
+      final resolvedTitle = projectTitle ??
+          (projectDoc?[FirebaseConstants.fieldTitle] ?? '').toString();
+      final rawTrack = (userDoc?[FirebaseConstants.fieldTrack] ?? '')
+          .toString()
+          .trim();
+      final trackLabel = rawTrack.isNotEmpty ? rawTrack : 'Contributor';
+      final rawSkills = userDoc?[FirebaseConstants.fieldSkills];
       final snapshot = {
         FirebaseConstants.fieldUid: uid,
         FirebaseConstants.fieldName:
@@ -255,11 +332,15 @@ class DiscoverRepository {
             _auth.currentUser?.photoURL ??
             '',
         FirebaseConstants.fieldPublicId:
-            userDoc?[FirebaseConstants.fieldPublicId] ?? uid,
-        FirebaseConstants.fieldTrack: track.name,
+            userDoc?['username'] ??
+            userDoc?[FirebaseConstants.fieldPublicId] ??
+            uid,
+        FirebaseConstants.fieldTrack: trackLabel,
         FirebaseConstants.fieldLevel:
             userDoc?[FirebaseConstants.fieldLevel] ??
-            UserLevel.intermediate.name,
+            UserLevel.intermediate.label,
+        FirebaseConstants.fieldSkills:
+            rawSkills is Iterable ? rawSkills.toList() : const <String>[],
       };
 
       await _firestore.setDocument(
@@ -267,10 +348,12 @@ class DiscoverRepository {
         docId: FirebaseConstants.requestDocId(projectId, uid),
         data: {
           FirebaseConstants.fieldProjectId: projectId,
-          FirebaseConstants.fieldProjectTitle: ?projectTitle,
+          if (resolvedTitle.isNotEmpty)
+            FirebaseConstants.fieldProjectTitle: resolvedTitle,
+          if (ownerId.isNotEmpty) FirebaseConstants.fieldOwnerId: ownerId,
           FirebaseConstants.fieldApplicantId: uid,
           FirebaseConstants.fieldApplicantSnapshot: snapshot,
-          FirebaseConstants.fieldTrack: track.name,
+          FirebaseConstants.fieldTrack: trackLabel,
           FirebaseConstants.fieldStatus: RequestStatus.pending.name,
           FirebaseConstants.fieldCreatedAt: _firestore.serverTimestamp,
         },
